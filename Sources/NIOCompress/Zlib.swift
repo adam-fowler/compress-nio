@@ -2,7 +2,8 @@
 import CNIOCompressZlib
 import NIO
 
-struct ZlibCompressor: NIOCompressor {
+/// Compressor using Zlib
+class ZlibCompressor: NIOCompressor {
     let windowBits: Int
     var isActive: Bool
     var stream = z_stream()
@@ -16,20 +17,33 @@ struct ZlibCompressor: NIOCompressor {
         self.lastError = nil
     }
 
-    mutating func startStream() {
+    deinit {
+        if isActive {
+            try? finishStream()
+        }
+    }
+
+    func startStream() throws {
         assert(!isActive)
-        isActive = true
         
         // zlib docs say: The application must initialize zalloc, zfree and opaque before calling the init function.
         stream.zalloc = nil
         stream.zfree = nil
         stream.opaque = nil
 
-        let rc = CNIOCompressZlib_deflateInit2(&self.stream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, Int32(windowBits), 8, Z_DEFAULT_STRATEGY)
-        precondition(rc == Z_OK, "Unexpected return from zlib init: \(rc)")
+        let rt = CNIOCompressZlib_deflateInit2(&self.stream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, Int32(windowBits), 8, Z_DEFAULT_STRATEGY)
+        switch rt {
+        case Z_MEM_ERROR:
+            throw NIOCompression.Error.noMoreMemory
+        case Z_OK:
+            break
+        default:
+            throw NIOCompression.Error.internalError
+        }
+        isActive = true
     }
     
-    mutating func streamDeflate(from: inout ByteBuffer, to: inout ByteBuffer, finalise: Bool) throws {
+    func streamDeflate(from: inout ByteBuffer, to: inout ByteBuffer, finalise: Bool) throws {
         assert(isActive)
         var bytesRead = 0
         var bytesWritten = 0
@@ -82,23 +96,29 @@ struct ZlibCompressor: NIOCompressor {
         from.moveReaderIndex(forwardBy: bytesRead)
     }
     
-    mutating func finishStream() {
+    func finishStream() throws {
         assert(isActive)
         isActive = false
-        deflateEnd(&self.stream)
+        let rt = deflateEnd(&self.stream)
+        switch rt {
+        case Z_OK:
+            break
+        default:
+            throw NIOCompression.Error.internalError
+        }
     }
     
-    mutating func deflateBound(from: ByteBuffer) -> Int {
+    func deflateBound(from: ByteBuffer) -> Int {
         // deflateBound() provides an upper limit on the number of bytes the input can
         // compress to. We add 5 bytes to handle the fact that Z_SYNC_FLUSH will append
         // an empty stored block that is 5 bytes long.
         // From zlib docs (https://www.zlib.net/manual.html)
-        // If the parameter flush is set to Z_SYNC_FLUSH, all pending output is flushed to the output buffer and the output is
+        // "If the parameter flush is set to Z_SYNC_FLUSH, all pending output is flushed to the output buffer and the output is
         // aligned on a byte boundary, so that the decompressor can get all input data available so far. (In particular avail_in
         // is zero after the call if enough output space has been provided before the call.) Flushing may degrade compression for
         // some compression algorithms and so it should be used only when necessary. This completes the current deflate block and
         // follows it with an empty stored block that is three bits plus filler bits to the next byte, followed by four bytes
-        // (00 00 ff ff).
+        // (00 00 ff ff)."
         // As we use avail_out == 0 as an indicator of whether the deflate was complete. I also add an extra byte to ensure we
         // always have at least one byte left in the compressed buffer after the deflate has completed.
         let bufferSize = Int(CNIOCompressZlib.deflateBound(&stream, UInt(from.readableBytes)))
@@ -106,7 +126,8 @@ struct ZlibCompressor: NIOCompressor {
     }
 }
 
-struct ZlibDecompressor: NIODecompressor {
+/// Decompressor using Zlib
+class ZlibDecompressor: NIODecompressor {
     let windowBits: Int
     var isActive: Bool
     var stream = z_stream()
@@ -120,19 +141,33 @@ struct ZlibDecompressor: NIODecompressor {
         self.lastError = nil
     }
 
-    mutating func startStream() {
-        assert(!isActive)
-        isActive = true
+    deinit {
+        if isActive {
+            try? finishStream()
+        }
+    }
 
+    func startStream() throws {
+        assert(!isActive)
+
+        // zlib docs say: The application must initialize zalloc, zfree and opaque before calling the init function.
         self.stream.zalloc = nil
         self.stream.zfree = nil
         self.stream.opaque = nil
 
-        let rc = CNIOCompressZlib_inflateInit2(&self.stream, Int32(windowBits))
-        precondition(rc == Z_OK, "Unexpected return from zlib init: \(rc)")
+        let rt = CNIOCompressZlib_inflateInit2(&self.stream, Int32(windowBits))
+        switch rt {
+        case Z_MEM_ERROR:
+            throw NIOCompression.Error.noMoreMemory
+        case Z_OK:
+            break
+        default:
+            throw NIOCompression.Error.internalError
+        }
+        isActive = true
     }
     
-    mutating func streamInflate(from: inout ByteBuffer, to: inout ByteBuffer) throws {
+    func streamInflate(from: inout ByteBuffer, to: inout ByteBuffer) throws {
         assert(isActive)
         var bytesRead = 0
         var bytesWritten = 0
@@ -183,9 +218,17 @@ struct ZlibDecompressor: NIODecompressor {
         from.moveReaderIndex(forwardBy: bytesRead)
     }
     
-    mutating func finishStream() {
+    func finishStream() throws {
         assert(isActive)
         isActive = false
-        inflateEnd(&self.stream)
+        let rt = inflateEnd(&self.stream)
+        switch rt {
+        case Z_DATA_ERROR:
+            throw NIOCompression.Error.unfinished
+        case Z_OK:
+            break
+        default:
+            throw NIOCompression.Error.internalError
+        }
     }
 }

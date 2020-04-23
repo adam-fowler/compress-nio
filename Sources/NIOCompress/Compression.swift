@@ -2,7 +2,8 @@
 import NIO
 
 public enum NIOCompression {
-
+    
+    /// Structure defining an Algorithm
     public struct Algorithm: CustomStringConvertible, Equatable {
         fileprivate enum AlgorithmEnum: String {
             case gzip
@@ -36,12 +37,14 @@ public enum NIOCompression {
         public static let gzip = Algorithm(algorithm: .gzip)
         public static let deflate = Algorithm(algorithm: .deflate)
     }
-
+    
+    /// Errors returned from compression/decompression routines
     public struct Error: Swift.Error, CustomStringConvertible, Equatable {
         fileprivate enum ErrorEnum: String {
             case bufferOverflow
             case corruptData
             case noMoreMemory
+            case unfinished
             case internalError
         }
         fileprivate let error: ErrorEnum
@@ -49,12 +52,17 @@ public enum NIOCompression {
         /// return as String
         public var description: String { return error.rawValue }
         
+        /// output buffer is too small
         public static let bufferOverflow = Error(error: .bufferOverflow)
+        /// input data is corrupt
         public static let corruptData = Error(error: .corruptData)
+        /// ran out of memory
         public static let noMoreMemory = Error(error: .noMoreMemory)
+        /// called `streamFinish`while there is still data to process
+        public static let unfinished = Error(error: .unfinished)
+        /// error internal to system
         public static let internalError = Error(error: .internalError)
     }
-        
 }
 
 
