@@ -3,7 +3,7 @@ import NIO
 
 public enum NIOCompression {
     
-    /// Structure defining an Algorithm
+    /// Compression Algorithm type
     public struct Algorithm: CustomStringConvertible, Equatable {
         fileprivate enum AlgorithmEnum: String {
             case gzip

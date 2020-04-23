@@ -1,7 +1,7 @@
 import XCTest
 
-import swift_nio_compressTests
+@testable import NIOCompressTests
 
-var tests = [XCTestCaseEntry]()
-tests += swift_nio_compressTests.allTests()
-XCTMain(tests)
+XCTMain([
+    testCase(NIOCompressTests.allTests),
+])

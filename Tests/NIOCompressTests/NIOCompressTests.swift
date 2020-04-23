@@ -4,6 +4,14 @@ import XCTest
 @testable import NIOCompress
 
 class NIOCompressTests: XCTestCase {
+    func createOrderedBuffer(size: Int) -> ByteBuffer {
+        var buffer = ByteBufferAllocator().buffer(capacity: size)
+        for _ in 0..<size {
+            buffer.writeInteger(UInt8(size&0xff))
+        }
+        return buffer
+    }
+    
     func createRandomBuffer(size: Int) -> ByteBuffer {
         var buffer = ByteBufferAllocator().buffer(capacity: size)
         for _ in 0..<size {
@@ -183,5 +191,21 @@ class NIOCompressTests: XCTestCase {
             XCTAssertEqual(outputBuffer, buffer)
         }
         try decompressor.finishStream()
+    }
+    
+    static var allTests : [(String, (NIOCompressTests) -> () throws -> Void)] {
+        return [
+            ("testGZipCompressDecompress", testGZipCompressDecompress),
+            ("testDeflateCompressDecompress", testDeflateCompressDecompress),
+            ("testGZipStreamCompressDecompress", testGZipStreamCompressDecompress),
+            ("testDeflateStreamCompressDecompress", testDeflateStreamCompressDecompress),
+            ("testTwoStreamsInParallel", testTwoStreamsInParallel),
+            ("testDecompressWithWrongAlgorithm", testDecompressWithWrongAlgorithm),
+            ("testCompressWithOverflowError", testCompressWithOverflowError),
+            ("testStreamCompressWithOverflowError", testStreamCompressWithOverflowError),
+            ("testRetryCompressAfterOverflowError", testRetryCompressAfterOverflowError),
+            ("testDecompressWithOverflowError", testDecompressWithOverflowError),
+            ("testRetryDecompressAfterOverflowError", testRetryDecompressAfterOverflowError),
+        ]
     }
 }
