@@ -2,7 +2,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "swift-nio-extras",
+    name: "swift-nio-compress",
     products: [
         .library(name: "NIOCompress", targets: ["NIOCompress"]),
     ],
