@@ -179,7 +179,7 @@ class ZlibDecompressor: NIODecompressor {
             bytesWritten = self.stream.next_out - CNIOCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
             switch rt {
             case Z_OK:
-                if self.stream.avail_out == 0 {
+                if self.stream.avail_out == 0 && self.stream.avail_in != 0 {
                     throw CompressNIOError.bufferOverflow
                 }
             case Z_BUF_ERROR:
