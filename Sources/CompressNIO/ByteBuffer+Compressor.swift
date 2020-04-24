@@ -102,7 +102,9 @@ extension ByteBuffer {
             var buffer = allocator.buffer(capacity: iteration * 3 * originalSize / 2)
             do {
                 defer {
-                    buffers.append(buffer)
+                    if buffer.readableBytes > 0 {
+                        buffers.append(buffer)
+                    }
                 }
                 try decompressStream(to: &buffer, with: decompressor)
             } catch let error as CompressNIOError where error == CompressNIOError.bufferOverflow {
@@ -112,8 +114,6 @@ extension ByteBuffer {
         
         try _decompress(iteration: 1)
         
-        // remove all empty buffers first
-        buffers = buffers.compactMap { return $0.readableBytes > 0 ? $0 : nil }
         if buffers.count == 0 {
             return allocator.buffer(capacity: 0)
         } else if buffers.count == 1 {

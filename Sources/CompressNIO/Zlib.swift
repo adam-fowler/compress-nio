@@ -23,7 +23,7 @@ class ZlibCompressor: NIOCompressor {
 
     func startStream() throws {
         assert(!isActive)
-        
+
         // zlib docs say: The application must initialize zalloc, zfree and opaque before calling the init function.
         stream.zalloc = nil
         stream.zfree = nil
@@ -40,26 +40,27 @@ class ZlibCompressor: NIOCompressor {
         }
         isActive = true
     }
-    
+
     func streamDeflate(from: inout ByteBuffer, to: inout ByteBuffer, finalise: Bool) throws {
         assert(isActive)
         var bytesRead = 0
         var bytesWritten = 0
-        
+
         defer {
             to.moveWriterIndex(forwardBy: bytesWritten)
         }
 
         try from.withUnsafeProcess(to: &to) { fromBuffer, toBuffer in
             let flag = finalise ? Z_FINISH : Z_SYNC_FLUSH
-            
+
             if lastError == nil {
                 self.stream.avail_in = UInt32(fromBuffer.count)
             }
             self.stream.next_in = CCompressZlib_voidPtr_to_BytefPtr(fromBuffer.baseAddress!)
             self.stream.avail_out = UInt32(toBuffer.count)
             self.stream.next_out = CCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
-            
+
+            lastError = nil
             let rt = CCompressZlib.deflate(&self.stream, flag)
             bytesRead = self.stream.next_in - CCompressZlib_voidPtr_to_BytefPtr(fromBuffer.baseAddress!)
             bytesWritten = self.stream.next_out - CCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
@@ -89,7 +90,7 @@ class ZlibCompressor: NIOCompressor {
         }
         from.moveReaderIndex(forwardBy: bytesRead)
     }
-    
+
     func finishStream() throws {
         assert(isActive)
         isActive = false
@@ -101,7 +102,7 @@ class ZlibCompressor: NIOCompressor {
             throw CompressNIOError.internalError
         }
     }
-    
+
     func maxSize(from: ByteBuffer) -> Int {
         // deflateBound() provides an upper limit on the number of bytes the input can
         // compress to. We add 5 bytes to handle the fact that Z_SYNC_FLUSH will append
@@ -156,7 +157,7 @@ class ZlibDecompressor: NIODecompressor {
         }
         isActive = true
     }
-    
+
     func streamInflate(from: inout ByteBuffer, to: inout ByteBuffer) throws {
         assert(isActive)
         var bytesRead = 0
@@ -195,7 +196,7 @@ class ZlibDecompressor: NIODecompressor {
             }
         }
     }
-    
+
     func finishStream() throws {
         assert(isActive)
         isActive = false
