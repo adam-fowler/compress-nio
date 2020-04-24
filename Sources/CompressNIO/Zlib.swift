@@ -29,7 +29,7 @@ class ZlibCompressor: NIOCompressor {
         stream.zfree = nil
         stream.opaque = nil
 
-        let rt = CNIOCompressZlib_deflateInit2(&self.stream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, Int32(windowBits), 8, Z_DEFAULT_STRATEGY)
+        let rt = CCompressZlib_deflateInit2(&self.stream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, Int32(windowBits), 8, Z_DEFAULT_STRATEGY)
         switch rt {
         case Z_MEM_ERROR:
             throw CompressNIOError.noMoreMemory
@@ -56,13 +56,13 @@ class ZlibCompressor: NIOCompressor {
             if lastError == nil {
                 self.stream.avail_in = UInt32(fromBuffer.count)
             }
-            self.stream.next_in = CNIOCompressZlib_voidPtr_to_BytefPtr(fromBuffer.baseAddress!)
+            self.stream.next_in = CCompressZlib_voidPtr_to_BytefPtr(fromBuffer.baseAddress!)
             self.stream.avail_out = UInt32(toBuffer.count)
-            self.stream.next_out = CNIOCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
+            self.stream.next_out = CCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
             
             let rt = CCompressZlib.deflate(&self.stream, flag)
-            bytesRead = self.stream.next_in - CNIOCompressZlib_voidPtr_to_BytefPtr(fromBuffer.baseAddress!)
-            bytesWritten = self.stream.next_out - CNIOCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
+            bytesRead = self.stream.next_in - CCompressZlib_voidPtr_to_BytefPtr(fromBuffer.baseAddress!)
+            bytesWritten = self.stream.next_out - CCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
             do {
                 switch rt {
                 case Z_OK:
@@ -145,7 +145,7 @@ class ZlibDecompressor: NIODecompressor {
         self.stream.zfree = nil
         self.stream.opaque = nil
 
-        let rt = CNIOCompressZlib_inflateInit2(&self.stream, Int32(windowBits))
+        let rt = CCompressZlib_inflateInit2(&self.stream, Int32(windowBits))
         switch rt {
         case Z_MEM_ERROR:
             throw CompressNIOError.noMoreMemory
@@ -169,14 +169,14 @@ class ZlibDecompressor: NIODecompressor {
 
         try from.withUnsafeProcess(to: &to) { fromBuffer, toBuffer in
             self.stream.avail_in = UInt32(fromBuffer.count)
-            self.stream.next_in = CNIOCompressZlib_voidPtr_to_BytefPtr(fromBuffer.baseAddress!)
+            self.stream.next_in = CCompressZlib_voidPtr_to_BytefPtr(fromBuffer.baseAddress!)
             self.stream.avail_out = UInt32(toBuffer.count)
-            self.stream.next_out = CNIOCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
+            self.stream.next_out = CCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
 
             let rt = CCompressZlib.inflate(&self.stream, Z_NO_FLUSH)
 
-            bytesRead = self.stream.next_in - CNIOCompressZlib_voidPtr_to_BytefPtr(fromBuffer.baseAddress!)
-            bytesWritten = self.stream.next_out - CNIOCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
+            bytesRead = self.stream.next_in - CCompressZlib_voidPtr_to_BytefPtr(fromBuffer.baseAddress!)
+            bytesWritten = self.stream.next_out - CCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
             switch rt {
             case Z_OK:
                 if self.stream.avail_out == 0 && self.stream.avail_in != 0 {
