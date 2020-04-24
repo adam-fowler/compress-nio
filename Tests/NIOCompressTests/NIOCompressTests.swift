@@ -45,19 +45,15 @@ class NIOCompressTests: XCTestCase {
         var compressedBuffer = byteBufferAllocator.buffer(capacity: 0)
 
         while bufferToCompress.readableBytes > 0 {
-            if blockSize < bufferToCompress.readableBytes {
-                var slice = bufferToCompress.readSlice(length: blockSize)!
-                var compressedSlice = try slice.compressStream(with: compressor, finalise: false)
-                compressedBuffer.writeBuffer(&compressedSlice)
-                compressedSlice.discardReadBytes()
-            } else {
-                var slice = bufferToCompress.readSlice(length: bufferToCompress.readableBytes)!
-                var compressedSlice = try slice.compressStream(with: compressor, finalise: true)
-                compressedBuffer.writeBuffer(&compressedSlice)
-                compressedSlice.discardReadBytes()
-            }
+            let size = min(blockSize, bufferToCompress.readableBytes)
+            var slice = bufferToCompress.readSlice(length: size)!
+            var compressedSlice = try slice.compressStream(with: compressor, finalise: false)
+            compressedBuffer.writeBuffer(&compressedSlice)
+            compressedSlice.discardReadBytes()
             bufferToCompress.discardReadBytes()
         }
+        var emptyBuffer = ByteBufferAllocator().buffer(capacity: 0)
+        try emptyBuffer.compressStream(to: &compressedBuffer, with: compressor, finalise: true)
         try compressor.finishStream()
 
         // decompress
@@ -268,7 +264,6 @@ class NIOCompressTests: XCTestCase {
         XCTAssertEqual(buffer, uncompressedBuffer)
     }
     
-
     static var allTests : [(String, (NIOCompressTests) -> () throws -> Void)] {
         return [
             ("testGZipCompressDecompress", testGZipCompressDecompress),
