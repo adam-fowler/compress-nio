@@ -1,9 +1,9 @@
 
 import NIO
 import XCTest
-@testable import NIOCompress
+@testable import CompressNIO
 
-class NIOCompressTests: XCTestCase {
+class CompressNIOTests: XCTestCase {
     /// Create random buffer
     /// - Parameters:
     ///   - size: size of buffer
@@ -117,7 +117,7 @@ class NIOCompressTests: XCTestCase {
             var outputBuffer = ByteBufferAllocator().buffer(capacity: 1024)
             try compressedBuffer.decompress(to: &outputBuffer, with: .deflate)
             XCTFail("Shouldn't get here")
-        } catch let error as NIOCompressError where error == NIOCompressError.corruptData {
+        } catch let error as CompressNIOError where error == CompressNIOError.corruptData {
         } catch {
             XCTFail()
         }
@@ -129,7 +129,7 @@ class NIOCompressTests: XCTestCase {
         do {
             try buffer.compress(to: &outputBuffer, with: .gzip)
             XCTFail("Shouldn't get here")
-        } catch let error as NIOCompressError where error == NIOCompressError.bufferOverflow {
+        } catch let error as CompressNIOError where error == CompressNIOError.bufferOverflow {
         } catch {
             XCTFail()
         }
@@ -143,7 +143,7 @@ class NIOCompressTests: XCTestCase {
             try compressor.startStream()
             try buffer.compressStream(to: &outputBuffer, with: compressor, finalise: false)
             XCTFail("Shouldn't get here")
-        } catch let error as NIOCompressError where error == NIOCompressError.bufferOverflow {
+        } catch let error as CompressNIOError where error == CompressNIOError.bufferOverflow {
         } catch {
             XCTFail()
         }
@@ -158,7 +158,7 @@ class NIOCompressTests: XCTestCase {
         do {
             try bufferToCompress.compressStream(to: &compressedBuffer, with: compressor, finalise: true)
             XCTFail("Shouldn't get here")
-        } catch let error as NIOCompressError where error == NIOCompressError.bufferOverflow {
+        } catch let error as CompressNIOError where error == CompressNIOError.bufferOverflow {
             var compressedBuffer2 = try bufferToCompress.compressStream(with: compressor, finalise: true)
             try compressor.finishStream()
             compressedBuffer.writeBuffer(&compressedBuffer2)
@@ -175,7 +175,7 @@ class NIOCompressTests: XCTestCase {
             var outputBuffer = ByteBufferAllocator().buffer(capacity: 512)
             try compressedBuffer.decompress(to: &outputBuffer, with: .gzip)
             XCTFail("Shouldn't get here")
-        } catch let error as NIOCompressError where error == NIOCompressError.bufferOverflow {
+        } catch let error as CompressNIOError where error == CompressNIOError.bufferOverflow {
         } catch {
             XCTFail()
         }
@@ -191,7 +191,7 @@ class NIOCompressTests: XCTestCase {
         do {
             try compressedBuffer.decompressStream(to: &outputBuffer, with: decompressor)
             XCTFail("Shouldn't get here")
-        } catch let error as NIOCompressError where error == NIOCompressError.bufferOverflow {
+        } catch let error as CompressNIOError where error == CompressNIOError.bufferOverflow {
             var outputBuffer2 = ByteBufferAllocator().buffer(capacity: 1024)
             try compressedBuffer.decompressStream(to: &outputBuffer2, with: decompressor)
             outputBuffer.writeBuffer(&outputBuffer2)
@@ -264,7 +264,7 @@ class NIOCompressTests: XCTestCase {
         XCTAssertEqual(buffer, uncompressedBuffer)
     }
     
-    static var allTests : [(String, (NIOCompressTests) -> () throws -> Void)] {
+    static var allTests : [(String, (CompressNIOTests) -> () throws -> Void)] {
         return [
             ("testGZipCompressDecompress", testGZipCompressDecompress),
             ("testDeflateCompressDecompress", testDeflateCompressDecompress),

@@ -105,7 +105,7 @@ extension ByteBuffer {
                     buffers.append(buffer)
                 }
                 try decompressStream(to: &buffer, with: decompressor)
-            } catch let error as NIOCompressError where error == NIOCompressError.bufferOverflow {
+            } catch let error as CompressNIOError where error == CompressNIOError.bufferOverflow {
                 try _decompress(iteration: iteration+1)
             }
         }

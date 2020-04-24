@@ -2,20 +2,20 @@
 import PackageDescription
 
 let package = Package(
-    name: "swift-nio-compress",
+    name: "compress-nio",
     products: [
-        .library(name: "NIOCompress", targets: ["NIOCompress"]),
+        .library(name: "CompressNIO", targets: ["CompressNIO"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.9.0"),
     ],
     targets: [
-        .target(name: "NIOCompress", dependencies: ["NIO", "CNIOCompressZlib"]),
-        .target(name: "CNIOCompressZlib",
+        .target(name: "CompressNIO", dependencies: ["NIO", "CCompressZlib"]),
+        .target(name: "CCompressZlib",
                 dependencies: [],
                 linkerSettings: [
                     .linkedLibrary("z")
                 ]),
-        .testTarget(name: "NIOCompressTests", dependencies: ["NIOCompress"]),
+        .testTarget(name: "CompressNIOTests", dependencies: ["CompressNIO"]),
     ]
 )

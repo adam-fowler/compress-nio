@@ -1,5 +1,5 @@
 
-import CNIOCompressZlib
+import CCompressZlib
 import NIO
 
 /// Compressor using Zlib
@@ -32,11 +32,11 @@ class ZlibCompressor: NIOCompressor {
         let rt = CNIOCompressZlib_deflateInit2(&self.stream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, Int32(windowBits), 8, Z_DEFAULT_STRATEGY)
         switch rt {
         case Z_MEM_ERROR:
-            throw NIOCompressError.noMoreMemory
+            throw CompressNIOError.noMoreMemory
         case Z_OK:
             break
         default:
-            throw NIOCompressError.internalError
+            throw CompressNIOError.internalError
         }
         isActive = true
     }
@@ -60,27 +60,27 @@ class ZlibCompressor: NIOCompressor {
             self.stream.avail_out = UInt32(toBuffer.count)
             self.stream.next_out = CNIOCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
             
-            let rt = CNIOCompressZlib.deflate(&self.stream, flag)
+            let rt = CCompressZlib.deflate(&self.stream, flag)
             bytesRead = self.stream.next_in - CNIOCompressZlib_voidPtr_to_BytefPtr(fromBuffer.baseAddress!)
             bytesWritten = self.stream.next_out - CNIOCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
             do {
                 switch rt {
                 case Z_OK:
                     if finalise == true {
-                        throw NIOCompressError.bufferOverflow
+                        throw CompressNIOError.bufferOverflow
                     } else if self.stream.avail_out == 0 {
-                        throw NIOCompressError.bufferOverflow
+                        throw CompressNIOError.bufferOverflow
                     }
                 case Z_DATA_ERROR:
-                    throw NIOCompressError.corruptData
+                    throw CompressNIOError.corruptData
                 case Z_BUF_ERROR:
-                    throw NIOCompressError.bufferOverflow
+                    throw CompressNIOError.bufferOverflow
                 case Z_MEM_ERROR:
-                    throw NIOCompressError.noMoreMemory
+                    throw CompressNIOError.noMoreMemory
                 case Z_STREAM_END:
                     break
                 default:
-                    throw NIOCompressError.internalError
+                    throw CompressNIOError.internalError
                 }
             } catch {
                 lastError = error
@@ -98,7 +98,7 @@ class ZlibCompressor: NIOCompressor {
         case Z_OK:
             break
         default:
-            throw NIOCompressError.internalError
+            throw CompressNIOError.internalError
         }
     }
     
@@ -115,7 +115,7 @@ class ZlibCompressor: NIOCompressor {
         // (00 00 ff ff)."
         // As we use avail_out == 0 as an indicator of whether the deflate was complete. I also add an extra byte to ensure we
         // always have at least one byte left in the compressed buffer after the deflate has completed.
-        let bufferSize = Int(CNIOCompressZlib.deflateBound(&stream, UInt(from.readableBytes)))
+        let bufferSize = Int(CCompressZlib.deflateBound(&stream, UInt(from.readableBytes)))
         return bufferSize + 6
     }
 }
@@ -148,11 +148,11 @@ class ZlibDecompressor: NIODecompressor {
         let rt = CNIOCompressZlib_inflateInit2(&self.stream, Int32(windowBits))
         switch rt {
         case Z_MEM_ERROR:
-            throw NIOCompressError.noMoreMemory
+            throw CompressNIOError.noMoreMemory
         case Z_OK:
             break
         default:
-            throw NIOCompressError.internalError
+            throw CompressNIOError.internalError
         }
         isActive = true
     }
@@ -173,25 +173,25 @@ class ZlibDecompressor: NIODecompressor {
             self.stream.avail_out = UInt32(toBuffer.count)
             self.stream.next_out = CNIOCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
 
-            let rt = CNIOCompressZlib.inflate(&self.stream, Z_NO_FLUSH)
+            let rt = CCompressZlib.inflate(&self.stream, Z_NO_FLUSH)
 
             bytesRead = self.stream.next_in - CNIOCompressZlib_voidPtr_to_BytefPtr(fromBuffer.baseAddress!)
             bytesWritten = self.stream.next_out - CNIOCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
             switch rt {
             case Z_OK:
                 if self.stream.avail_out == 0 {
-                    throw NIOCompressError.bufferOverflow
+                    throw CompressNIOError.bufferOverflow
                 }
             case Z_BUF_ERROR:
-                throw NIOCompressError.bufferOverflow
+                throw CompressNIOError.bufferOverflow
             case Z_DATA_ERROR:
-                throw NIOCompressError.corruptData
+                throw CompressNIOError.corruptData
             case Z_MEM_ERROR:
-                throw NIOCompressError.noMoreMemory
+                throw CompressNIOError.noMoreMemory
             case Z_STREAM_END:
                 break
             default:
-                throw NIOCompressError.internalError
+                throw CompressNIOError.internalError
             }
         }
     }
@@ -202,11 +202,11 @@ class ZlibDecompressor: NIODecompressor {
         let rt = inflateEnd(&self.stream)
         switch rt {
         case Z_DATA_ERROR:
-            throw NIOCompressError.unfinished
+            throw CompressNIOError.unfinished
         case Z_OK:
             break
         default:
-            throw NIOCompressError.internalError
+            throw CompressNIOError.internalError
         }
     }
 }
