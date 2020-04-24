@@ -28,36 +28,6 @@ extension ByteBuffer {
     ///     - `NIOCompression.Error.bufferOverflow` if output byte buffer doesn't have enough space to write the decompressed data into
     ///     - `NIOCompression.Error.corruptData` if the input byte buffer is corrupted
     public mutating func decompress(with algorithm: CompressionAlgorithm, allocator: ByteBufferAllocator = ByteBufferAllocator()) throws -> ByteBuffer {
-        /*var buffers: [ByteBuffer] = []
-        let originalSize = self.readableBytes
-        let decompressor = algorithm.decompressor
-        func _decompress(iteration: Int) throws {
-            // grow buffer to write into with each iteration
-            var buffer = allocator.buffer(capacity: iteration * 3 * originalSize / 2)
-            do {
-                defer {
-                    buffers.append(buffer)
-                }
-                try decompressStream(to: &buffer, with: decompressor)
-            } catch let error as NIOCompressError where error == NIOCompressError.bufferOverflow {
-                try _decompress(iteration: iteration+1)
-            }
-        }
-        try decompressor.startStream()
-        try _decompress(iteration: 1)
-        try decompressor.finishStream()
-        
-        // concatenate all the buffers together
-        if buffers.count == 1 {
-            return buffers[0]
-        } else {
-            let size = buffers.reduce(0) { return $0 + $1.readableBytes }
-            var finalBuffer = allocator.buffer(capacity: size)
-            for var buffer in buffers {
-                finalBuffer.writeBuffer(&buffer)
-            }
-            return finalBuffer
-        }*/
         let decompressor = algorithm.decompressor
         try decompressor.startStream()
         let buffer = try decompressStream(with: decompressor, allocator: allocator)

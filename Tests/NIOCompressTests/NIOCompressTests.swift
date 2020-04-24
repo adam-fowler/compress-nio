@@ -277,6 +277,9 @@ class NIOCompressTests: XCTestCase {
             ("testRetryCompressAfterOverflowError", testRetryCompressAfterOverflowError),
             ("testDecompressWithOverflowError", testDecompressWithOverflowError),
             ("testRetryDecompressAfterOverflowError", testRetryDecompressAfterOverflowError),
+            ("testAllocatingDecompress", testAllocatingDecompress),
+            ("testRandomAllocatingDecompress", testRandomAllocatingDecompress),
+            ("testAllocatingStreamCompressDecompress", testAllocatingStreamCompressDecompress),
         ]
     }
 }
