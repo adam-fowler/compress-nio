@@ -112,10 +112,14 @@ extension ByteBuffer {
         
         try _decompress(iteration: 1)
         
-        // concatenate all the buffers together
-        if buffers.count == 1 {
+        // remove all empty buffers first
+        buffers = buffers.compactMap { return $0.readableBytes > 0 ? $0 : nil }
+        if buffers.count == 0 {
+            return allocator.buffer(capacity: 0)
+        } else if buffers.count == 1 {
             return buffers[0]
         } else {
+            // concatenate all the buffers together
             let size = buffers.reduce(0) { return $0 + $1.readableBytes }
             var finalBuffer = allocator.buffer(capacity: size)
             for var buffer in buffers {

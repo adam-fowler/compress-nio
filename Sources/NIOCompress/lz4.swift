@@ -4,6 +4,7 @@ import NIO
 /// Compressor using LZ4
 class LZ4Compressor: NIOCompressor {
     var stream: UnsafeMutablePointer<LZ4_stream_t>?
+    var dictionary: ByteBuffer! = nil
     
     init() {
         stream = nil
@@ -12,6 +13,7 @@ class LZ4Compressor: NIOCompressor {
     func startStream() throws {
         assert(self.stream == nil)
         self.stream = LZ4_createStream()
+        self.dictionary = ByteBufferAllocator().buffer(capacity: 64*1024)
     }
     
     func streamDeflate(from: inout ByteBuffer, to: inout ByteBuffer, finalise: Bool) throws {
@@ -31,6 +33,11 @@ class LZ4Compressor: NIOCompressor {
             if rt < 0 {
                 throw NIOCompressError.bufferOverflow
             }
+            
+            _ = dictionary.withUnsafeMutableReadableBytes { buffer in
+                LZ4_saveDict(stream, LZ4_voidPtr_to_CharPtr(buffer.baseAddress!), 64*1024)
+            }
+            
             bytesRead = fromBuffer.count
             bytesWritten = Int(rt)
         }
@@ -42,6 +49,7 @@ class LZ4Compressor: NIOCompressor {
         assert(self.stream != nil)
         LZ4_freeStream(stream)
         self.stream = nil
+        self.dictionary = nil
     }
     
     func maxSize(from: ByteBuffer) -> Int {
