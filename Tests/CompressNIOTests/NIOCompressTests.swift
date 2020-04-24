@@ -103,7 +103,7 @@ class CompressNIOTests: XCTestCase {
         var bufferToCompress = buffer
         var compressedBuffer = try streamCompress(algorithm, buffer: &bufferToCompress, blockSize: blockSize)
 
-        var uncompressedBuffer = byteBufferAllocator.buffer(capacity: bufferSize)
+        var uncompressedBuffer = byteBufferAllocator.buffer(capacity: bufferSize+1)
         try streamDecompress(algorithm, from: &compressedBuffer, to: &uncompressedBuffer, blockSize: 1024)
 
         XCTAssertEqual(buffer, uncompressedBuffer)
@@ -111,7 +111,7 @@ class CompressNIOTests: XCTestCase {
 
     /// testBlockStreamCompressDecompress is different from testStreamCompressDecompress as it decompresses the
     /// slice that were compressed while testStreamCompressDecompress decompresses on a arbitrary block size
-    func testBlockStreamCompressDecompress(_ algorithm: CompressionAlgorithm, bufferSize: Int = 16383, blockSize: Int = 1024) throws {
+    func testBlockStreamCompressDecompress(_ algorithm: CompressionAlgorithm, bufferSize: Int = 16384, blockSize: Int = 1024) throws {
         let byteBufferAllocator = ByteBufferAllocator()
         let buffer = createRandomBuffer(size: bufferSize, randomness: 50)
 
@@ -120,7 +120,7 @@ class CompressNIOTests: XCTestCase {
         let compressedBuffers = try streamBlockCompress(algorithm, buffer: &bufferToCompress)
 
         // decompress
-        var uncompressedBuffer = byteBufferAllocator.buffer(capacity: bufferSize)
+        var uncompressedBuffer = byteBufferAllocator.buffer(capacity: bufferSize+1)
         try streamBlockDecompress(algorithm, from: compressedBuffers, to: &uncompressedBuffer)
 
         XCTAssertEqual(buffer, uncompressedBuffer)
@@ -136,11 +136,17 @@ class CompressNIOTests: XCTestCase {
 
     func testGZipStreamCompressDecompress() throws {
         try testStreamCompressDecompress(.gzip)
-        try testBlockStreamCompressDecompress(.gzip)
     }
 
     func testDeflateStreamCompressDecompress() throws {
         try testStreamCompressDecompress(.deflate)
+    }
+
+    func testGZipBlockStreamCompressDecompress() throws {
+        try testBlockStreamCompressDecompress(.gzip)
+    }
+
+    func testDeflateBlockStreamCompressDecompress() throws {
         try testBlockStreamCompressDecompress(.deflate)
     }
 
@@ -378,6 +384,8 @@ class CompressNIOTests: XCTestCase {
             ("testDeflateCompressDecompress", testDeflateCompressDecompress),
             ("testGZipStreamCompressDecompress", testGZipStreamCompressDecompress),
             ("testDeflateStreamCompressDecompress", testDeflateStreamCompressDecompress),
+            ("testGZipBlockStreamCompressDecompress", testGZipStreamCompressDecompress),
+            ("testDeflateBlockStreamCompressDecompress", testDeflateStreamCompressDecompress),
             ("testTwoStreamsInParallel", testTwoStreamsInParallel),
             ("testDecompressWithWrongAlgorithm", testDecompressWithWrongAlgorithm),
             ("testCompressWithOverflowError", testCompressWithOverflowError),
