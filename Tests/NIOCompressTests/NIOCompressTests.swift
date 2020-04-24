@@ -202,6 +202,17 @@ class NIOCompressTests: XCTestCase {
         try decompressor.finishStream()
     }
     
+    func testAllocatingDecompress() throws {
+        let bufferSize = 16000
+        // create a buffer that will compress well
+        let buffer = createOrderedBuffer(size: bufferSize)
+        var bufferToCompress = buffer
+        var compressedBuffer = try bufferToCompress.compress(with: .gzip)
+        let uncompressedBuffer = try compressedBuffer.decompress(with: .gzip)
+        XCTAssertEqual(buffer, uncompressedBuffer)
+    }
+    
+
     static var allTests : [(String, (NIOCompressTests) -> () throws -> Void)] {
         return [
             ("testGZipCompressDecompress", testGZipCompressDecompress),
