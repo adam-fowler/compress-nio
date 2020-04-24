@@ -10,7 +10,7 @@ extension ByteBuffer {
     /// - Throws:
     ///     - `NIOCompression.Error.bufferOverflow` if output byte buffer doesn't have enough space to write the decompressed data into
     ///     - `NIOCompression.Error.corruptData` if the input byte buffer is corrupted
-    public mutating func decompress(to buffer: inout ByteBuffer, with algorithm: NIOCompression.Algorithm) throws {
+    public mutating func decompress(to buffer: inout ByteBuffer, with algorithm: CompressionAlgorithm) throws {
         let decompressor = algorithm.decompressor
         try decompressor.inflate(from: &self, to: &buffer)
     }
@@ -21,7 +21,7 @@ extension ByteBuffer {
     ///   - algorithm: Algorithm to use when compressing
     /// - Throws:
     ///     - `NIOCompression.Error.bufferOverflow` if output byte buffer doesnt have enough space to write the compressed data into
-    public mutating func compress(to buffer: inout ByteBuffer, with algorithm: NIOCompression.Algorithm) throws {
+    public mutating func compress(to buffer: inout ByteBuffer, with algorithm: CompressionAlgorithm) throws {
         let compressor = algorithm.compressor
         try compressor.deflate(from: &self, to: &buffer)
     }
@@ -31,7 +31,7 @@ extension ByteBuffer {
     ///   - algorithm: Algorithm to use when compressing
     ///   - allocator: Byte buffer allocator used to create new byte buffer
     /// - Returns: the new byte buffer with the compressed data
-    public mutating func compress(with algorithm: NIOCompression.Algorithm, allocator: ByteBufferAllocator) throws -> ByteBuffer {
+    public mutating func compress(with algorithm: CompressionAlgorithm, allocator: ByteBufferAllocator) throws -> ByteBuffer {
         let compressor = algorithm.compressor
         var buffer = allocator.buffer(capacity: compressor.deflateBound(from: self))
         try compressor.deflate(from: &self, to: &buffer)

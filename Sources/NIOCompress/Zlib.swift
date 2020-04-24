@@ -32,11 +32,11 @@ class ZlibCompressor: NIOCompressor {
         let rt = CNIOCompressZlib_deflateInit2(&self.stream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, Int32(windowBits), 8, Z_DEFAULT_STRATEGY)
         switch rt {
         case Z_MEM_ERROR:
-            throw NIOCompression.Error.noMoreMemory
+            throw NIOCompressError.noMoreMemory
         case Z_OK:
             break
         default:
-            throw NIOCompression.Error.internalError
+            throw NIOCompressError.internalError
         }
         isActive = true
     }
@@ -67,20 +67,20 @@ class ZlibCompressor: NIOCompressor {
                 switch rt {
                 case Z_OK:
                     if finalise == true {
-                        throw NIOCompression.Error.bufferOverflow
+                        throw NIOCompressError.bufferOverflow
                     } else if self.stream.avail_out == 0 {
-                        throw NIOCompression.Error.bufferOverflow
+                        throw NIOCompressError.bufferOverflow
                     }
                 case Z_DATA_ERROR:
-                    throw NIOCompression.Error.corruptData
+                    throw NIOCompressError.corruptData
                 case Z_BUF_ERROR:
-                    throw NIOCompression.Error.bufferOverflow
+                    throw NIOCompressError.bufferOverflow
                 case Z_MEM_ERROR:
-                    throw NIOCompression.Error.noMoreMemory
+                    throw NIOCompressError.noMoreMemory
                 case Z_STREAM_END:
                     break
                 default:
-                    throw NIOCompression.Error.internalError
+                    throw NIOCompressError.internalError
                 }
             } catch {
                 lastError = error
@@ -98,7 +98,7 @@ class ZlibCompressor: NIOCompressor {
         case Z_OK:
             break
         default:
-            throw NIOCompression.Error.internalError
+            throw NIOCompressError.internalError
         }
     }
     
@@ -148,11 +148,11 @@ class ZlibDecompressor: NIODecompressor {
         let rt = CNIOCompressZlib_inflateInit2(&self.stream, Int32(windowBits))
         switch rt {
         case Z_MEM_ERROR:
-            throw NIOCompression.Error.noMoreMemory
+            throw NIOCompressError.noMoreMemory
         case Z_OK:
             break
         default:
-            throw NIOCompression.Error.internalError
+            throw NIOCompressError.internalError
         }
         isActive = true
     }
@@ -180,18 +180,18 @@ class ZlibDecompressor: NIODecompressor {
             switch rt {
             case Z_OK:
                 if self.stream.avail_out == 0 {
-                    throw NIOCompression.Error.bufferOverflow
+                    throw NIOCompressError.bufferOverflow
                 }
             case Z_BUF_ERROR:
-                throw NIOCompression.Error.bufferOverflow
+                throw NIOCompressError.bufferOverflow
             case Z_DATA_ERROR:
-                throw NIOCompression.Error.corruptData
+                throw NIOCompressError.corruptData
             case Z_MEM_ERROR:
-                throw NIOCompression.Error.noMoreMemory
+                throw NIOCompressError.noMoreMemory
             case Z_STREAM_END:
                 break
             default:
-                throw NIOCompression.Error.internalError
+                throw NIOCompressError.internalError
             }
         }
     }
@@ -202,11 +202,11 @@ class ZlibDecompressor: NIODecompressor {
         let rt = inflateEnd(&self.stream)
         switch rt {
         case Z_DATA_ERROR:
-            throw NIOCompression.Error.unfinished
+            throw NIOCompressError.unfinished
         case Z_OK:
             break
         default:
-            throw NIOCompression.Error.internalError
+            throw NIOCompressError.internalError
         }
     }
 }
