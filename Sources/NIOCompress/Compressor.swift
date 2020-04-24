@@ -54,7 +54,7 @@ public protocol NIOCompressor: class {
     
     /// Return the maximum possible number of bytes required for the compressed version of a `ByteBuffer`
     /// - Parameter from: `ByteBuffer` to get maximum size for
-    func deflateBound(from: ByteBuffer) -> Int
+    func maxSize(from: ByteBuffer) -> Int
 }
 
 extension NIOCompressor {

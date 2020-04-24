@@ -102,7 +102,7 @@ class ZlibCompressor: NIOCompressor {
         }
     }
     
-    func deflateBound(from: ByteBuffer) -> Int {
+    func maxSize(from: ByteBuffer) -> Int {
         // deflateBound() provides an upper limit on the number of bytes the input can
         // compress to. We add 5 bytes to handle the fact that Z_SYNC_FLUSH will append
         // an empty stored block that is 5 bytes long.
