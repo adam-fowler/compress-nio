@@ -1,9 +1,9 @@
-# Swift NIO Compress
+# Compress NIO
 
 A compression library for Swift NIO ByteBuffers.
 
 # Compress and Decompress
-Swift NIO Compress contains a number of methods for compressing and decompressing `ByteBuffers`. A simple usage would be 
+Compress NIO contains a number of methods for compressing and decompressing `ByteBuffers`. A simple usage would be 
 ```swift
 var compressedBuffer = buffer.compress(with: .gzip)
 var uncompressedBuffer = buffer.decompress(with: .gzip)
@@ -19,7 +19,7 @@ try compressedBuffer.decompress(to: &uncompressedBuffer, with: .deflate)
 ```
 In the above example there is a call to a function `CompressionAlgorithm.deflate.compressor.maxSize(from:buffer)`. This returns the maximum size of buffer required to write out compressed data for the `deflate` compression algorithm.
 
-If you provide a buffer that is too small a `NIOCompress.bufferOverflow` error is thrown. You will need to provide a larger `ByteBuffer` to complete your operation.
+If you provide a buffer that is too small a `CompressNIO.bufferOverflow` error is thrown. You will need to provide a larger `ByteBuffer` to complete your operation.
 
 # Streaming
 There are situations where you might want to or are required to compress/decompress a block of data in smaller slices. If you have a large file you want to compress it is probably best to load it in smaller slices instead of loading it all into memory in one go. If you are receiving a block of compressed data via HTTP you cannot guarantee it will be delivered in one slice. Swift NIO Compress provides a streaming api to support these situations. 
@@ -40,4 +40,4 @@ var emptyBuffer = ByteBufferAllocator().buffer(capacity: 0)
 try emptyBuffer.compressStream(to: &compressedBuffer, with: compressor, finalise: true)
 ```
 
-While streaming if the buffer you are compressing into is too small a `NIOCompress.bufferOverflow` error will be thrown. In this situation you can provide another `ByteBuffer` to receive the remains of the data. Data may have already been decompressed into your original buffer so don't throw away the original.
+While streaming if the buffer you are compressing into is too small a `CompressNIO.bufferOverflow` error will be thrown. In this situation you can provide another `ByteBuffer` to receive the remains of the data. Data may have already been decompressed into your original buffer so don't throw away the original.
