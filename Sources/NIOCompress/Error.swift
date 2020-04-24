@@ -26,5 +26,3 @@ public struct NIOCompressError: Swift.Error, CustomStringConvertible, Equatable 
     /// error internal to system
     public static let internalError = NIOCompressError(error: .internalError)
 }
-
-

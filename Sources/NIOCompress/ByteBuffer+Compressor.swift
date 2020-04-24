@@ -29,10 +29,11 @@ extension ByteBuffer {
     ///     - `NIOCompression.Error.corruptData` if the input byte buffer is corrupted
     public mutating func decompress(with algorithm: CompressionAlgorithm, allocator: ByteBufferAllocator = ByteBufferAllocator()) throws -> ByteBuffer {
         var buffers: [ByteBuffer] = []
+        let originalSize = self.readableBytes
         let decompressor = algorithm.decompressor
         func _decompress(iteration: Int) throws {
             // grow buffer to write into with each iteration
-            var buffer = allocator.buffer(capacity: iteration * 3 * self.readableBytes / 2)
+            var buffer = allocator.buffer(capacity: iteration * 3 * originalSize / 2)
             do {
                 defer {
                     buffers.append(buffer)
