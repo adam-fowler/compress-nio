@@ -37,18 +37,24 @@ class NIOCompressTests: XCTestCase {
         let buffer = createRandomBuffer(size: bufferSize)
         
         // compress
-        var compressedBuffers: [ByteBuffer] = []
         var bufferToCompress = buffer
         let compressor = algorithm.compressor
         try compressor.startStream()
+        var compressedBuffer = byteBufferAllocator.buffer(capacity: 0)
+
         while bufferToCompress.readableBytes > 0 {
             if blockSize < bufferToCompress.readableBytes {
                 var slice = bufferToCompress.readSlice(length: blockSize)!
-                compressedBuffers.append(try slice.compressStream(with: compressor, finalise: false, allocator: byteBufferAllocator))
+                var compressedSlice = try slice.compressStream(with: compressor, finalise: false, allocator: byteBufferAllocator)
+                compressedBuffer.writeBuffer(&compressedSlice)
+                compressedSlice.discardReadBytes()
             } else {
                 var slice = bufferToCompress.readSlice(length: bufferToCompress.readableBytes)!
-                compressedBuffers.append(try slice.compressStream(with: compressor, finalise: true, allocator: byteBufferAllocator))
+                var compressedSlice = try slice.compressStream(with: compressor, finalise: true, allocator: byteBufferAllocator)
+                compressedBuffer.writeBuffer(&compressedSlice)
+                compressedSlice.discardReadBytes()
             }
+            bufferToCompress.discardReadBytes()
         }
         try compressor.finishStream()
 
@@ -56,8 +62,11 @@ class NIOCompressTests: XCTestCase {
         var uncompressedBuffer = byteBufferAllocator.buffer(capacity: bufferSize)
         let decompressor = algorithm.decompressor
         try decompressor.startStream()
-        for i in 0..<compressedBuffers.count {
-            try compressedBuffers[i].decompressStream(to: &uncompressedBuffer, with: decompressor)
+        while compressedBuffer.readableBytes > 0 {
+            let size = min(blockSize, compressedBuffer.readableBytes)
+            var slice = compressedBuffer.readSlice(length: size)!
+            try slice.decompressStream(to: &uncompressedBuffer, with: decompressor)
+            compressedBuffer.discardReadBytes()
         }
         try decompressor.finishStream()
 
