@@ -31,7 +31,7 @@ class LZ4Compressor: NIOCompressor {
                 1
             )
             if rt < 0 {
-                throw NIOCompressError.bufferOverflow
+                throw CompressNIOError.bufferOverflow
             }
             
             _ = dictionary.withUnsafeMutableReadableBytes { buffer in
@@ -69,7 +69,7 @@ class LZ4Compressor: NIOCompressor {
                 Int32(toBuffer.count)
             )
             if rt < 0 {
-                throw NIOCompressError.bufferOverflow
+                throw CompressNIOError.bufferOverflow
             }
             bytesRead = fromBuffer.count
             bytesWritten = Int(rt)
@@ -102,7 +102,7 @@ public class LZ4Decompressor: NIODecompressor {
                 Int32(toBuffer.count)
             )
             if rt < 0 {
-                throw NIOCompressError.bufferOverflow
+                throw CompressNIOError.bufferOverflow
             }
             bytesRead = fromBuffer.count
             bytesWritten = Int(rt)
@@ -129,7 +129,7 @@ public class LZ4Decompressor: NIODecompressor {
                 Int32(toBuffer.count)
             )
             if rt < 0 {
-                throw NIOCompressError.bufferOverflow
+                throw CompressNIOError.bufferOverflow
             }
             bytesRead = fromBuffer.count
             bytesWritten = Int(rt)
