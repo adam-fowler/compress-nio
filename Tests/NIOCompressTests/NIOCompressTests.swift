@@ -4,25 +4,27 @@ import XCTest
 @testable import NIOCompress
 
 class NIOCompressTests: XCTestCase {
-    func createOrderedBuffer(size: Int) -> ByteBuffer {
+    /// Create random buffer
+    /// - Parameters:
+    ///   - size: size of buffer
+    ///   - randomness: how random you want the buffer to be (percentage)
+    func createRandomBuffer(size: Int, randomness: Int = 100) -> ByteBuffer {
         var buffer = ByteBufferAllocator().buffer(capacity: size)
+        let randomness = (randomness * randomness) / 100
         for _ in 0..<size {
-            buffer.writeInteger(UInt8(size&0xff))
-        }
-        return buffer
-    }
-    
-    func createRandomBuffer(size: Int) -> ByteBuffer {
-        var buffer = ByteBufferAllocator().buffer(capacity: size)
-        for _ in 0..<size {
-            buffer.writeInteger(UInt8.random(in: UInt8.min...UInt8.max))
+            let random = Int.random(in: 0..<25600)
+            if random < randomness*256 {
+                buffer.writeInteger(UInt8(random & 0xff))
+            } else {
+                buffer.writeInteger(UInt8(size & 0xff))
+            }
         }
         return buffer
     }
     
     func testCompressDecompress(_ algorithm: CompressionAlgorithm) throws {
         let bufferSize = 16000
-        let buffer = createRandomBuffer(size: bufferSize)
+        let buffer = createRandomBuffer(size: bufferSize, randomness: 50)
         var bufferToCompress = buffer
         var compressedBuffer = try bufferToCompress.compress(with: algorithm, allocator: ByteBufferAllocator())
         var uncompressedBuffer = ByteBufferAllocator().buffer(capacity: bufferSize)
@@ -34,7 +36,7 @@ class NIOCompressTests: XCTestCase {
         let byteBufferAllocator = ByteBufferAllocator()
         let bufferSize = 16000
         let blockSize = 1024
-        let buffer = createRandomBuffer(size: bufferSize)
+        let buffer = createRandomBuffer(size: bufferSize, randomness: 50)
         
         // compress
         var bufferToCompress = buffer
@@ -205,7 +207,7 @@ class NIOCompressTests: XCTestCase {
     func testAllocatingDecompress() throws {
         let bufferSize = 16000
         // create a buffer that will compress well
-        let buffer = createOrderedBuffer(size: bufferSize)
+        let buffer = createRandomBuffer(size: bufferSize, randomness: 10)
         var bufferToCompress = buffer
         var compressedBuffer = try bufferToCompress.compress(with: .gzip)
         let uncompressedBuffer = try compressedBuffer.decompress(with: .gzip)
@@ -215,13 +217,58 @@ class NIOCompressTests: XCTestCase {
     func testRandomAllocatingDecompress() throws {
         let bufferSize = 16000
         // create a buffer that will compress well
-        let buffer = createRandomBuffer(size: bufferSize)
+        let buffer = createRandomBuffer(size: bufferSize, randomness: 100)
         var bufferToCompress = buffer
         var compressedBuffer = try bufferToCompress.compress(with: .gzip)
         let uncompressedBuffer = try compressedBuffer.decompress(with: .gzip)
         XCTAssertEqual(buffer, uncompressedBuffer)
     }
+
+    func testAllocatingStreamCompressDecompress() throws {
+        let algorithm: CompressionAlgorithm = .gzip
+        let bufferSize = 16000
+        let blockSize = 1024
+        let buffer = createRandomBuffer(size: bufferSize, randomness: 25)
+        
+        // compress
+        var bufferToCompress = buffer
+        let compressor = algorithm.compressor
+        try compressor.startStream()
+        var compressedBuffer = ByteBufferAllocator().buffer(capacity: 0)
+
+        while bufferToCompress.readableBytes > 0 {
+            if blockSize < bufferToCompress.readableBytes {
+                var slice = bufferToCompress.readSlice(length: blockSize)!
+                var compressedSlice = try slice.compressStream(with: compressor, finalise: false)
+                compressedBuffer.writeBuffer(&compressedSlice)
+                compressedSlice.discardReadBytes()
+            } else {
+                var slice = bufferToCompress.readSlice(length: bufferToCompress.readableBytes)!
+                var compressedSlice = try slice.compressStream(with: compressor, finalise: true)
+                compressedBuffer.writeBuffer(&compressedSlice)
+                compressedSlice.discardReadBytes()
+            }
+            bufferToCompress.discardReadBytes()
+        }
+        try compressor.finishStream()
+
+        // decompress
+        var uncompressedBuffer = ByteBufferAllocator().buffer(capacity: bufferSize)
+        let decompressor = algorithm.decompressor
+        try decompressor.startStream()
+        while compressedBuffer.readableBytes > 0 {
+            let size = min(512, compressedBuffer.readableBytes)
+            var slice = compressedBuffer.readSlice(length: size)!
+            var uncompressedBuffer2 = try slice.decompressStream(with: decompressor)
+            uncompressedBuffer.writeBuffer(&uncompressedBuffer2)
+            compressedBuffer.discardReadBytes()
+        }
+        try decompressor.finishStream()
+
+        XCTAssertEqual(buffer, uncompressedBuffer)
+    }
     
+
     static var allTests : [(String, (NIOCompressTests) -> () throws -> Void)] {
         return [
             ("testGZipCompressDecompress", testGZipCompressDecompress),

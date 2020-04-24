@@ -18,7 +18,7 @@ extension ByteBuffer {
     /// Allocate a `ByteBuffer` to decompress this buffer into. Decompress  the readable contents of this byte buffer into the allocated buffer. If the allocated buffer is too small allocate more space
     /// and continue the decompression.
     ///
-    /// Seeing as this method cannot tell the size of the buffer required to allocate to decompress into it may allocate many `ByteBuffers` during the decompress
+    /// Seeing as this method cannot tell the size of the buffer required to allocate for decompression it may allocate many `ByteBuffers` during the decompress
     /// process. It is always preferable to know in advance the size of the decompressed buffer and to use `decompress(to:with:)`.
     ///
     /// - Parameters:
@@ -28,7 +28,7 @@ extension ByteBuffer {
     ///     - `NIOCompression.Error.bufferOverflow` if output byte buffer doesn't have enough space to write the decompressed data into
     ///     - `NIOCompression.Error.corruptData` if the input byte buffer is corrupted
     public mutating func decompress(with algorithm: CompressionAlgorithm, allocator: ByteBufferAllocator = ByteBufferAllocator()) throws -> ByteBuffer {
-        var buffers: [ByteBuffer] = []
+        /*var buffers: [ByteBuffer] = []
         let originalSize = self.readableBytes
         let decompressor = algorithm.decompressor
         func _decompress(iteration: Int) throws {
@@ -57,7 +57,12 @@ extension ByteBuffer {
                 finalBuffer.writeBuffer(&buffer)
             }
             return finalBuffer
-        }
+        }*/
+        let decompressor = algorithm.decompressor
+        try decompressor.startStream()
+        let buffer = try decompressStream(with: decompressor, allocator: allocator)
+        try decompressor.finishStream()
+        return buffer
     }
 
     /// Compress the readable contents of this byte buffer into another using the compression algorithm specified
@@ -108,6 +113,46 @@ extension ByteBuffer {
     ///     - `NIOCompression.Error.corruptData` if the input byte buffer is corrupted
     public mutating func decompressStream(to byteBuffer: inout ByteBuffer, with decompressor: NIODecompressor) throws {
         try decompressor.streamInflate(from: &self, to: &byteBuffer)
+    }
+    
+    /// A version of decompressStream which allocates the ByteBuffer to write into.
+    ///
+    /// As with `decompress(with:allocator)` this method cannot tell the size of the buffer required to allocate for the decompression. It may allocate many `ByteBuffers` during the decompress
+    /// process. It is always preferable to know in advance the size of the decompressed buffer and to use `decompressStream(to:with:)`.
+    ///
+    /// - Parameters:
+    ///   - decompressor: Algorithm to use when decompressing
+    ///   - allocator: Byte buffer allocator used to allocate the new `ByteBuffer`
+    /// - Returns: `ByteBuffer` containing compressed data
+    public mutating func decompressStream(with decompressor: NIODecompressor, allocator: ByteBufferAllocator = ByteBufferAllocator()) throws -> ByteBuffer {
+        var buffers: [ByteBuffer] = []
+        let originalSize = self.readableBytes
+        func _decompress(iteration: Int) throws {
+            // grow buffer to write into with each iteration
+            var buffer = allocator.buffer(capacity: iteration * 3 * originalSize / 2)
+            do {
+                defer {
+                    buffers.append(buffer)
+                }
+                try decompressStream(to: &buffer, with: decompressor)
+            } catch let error as NIOCompressError where error == NIOCompressError.bufferOverflow {
+                try _decompress(iteration: iteration+1)
+            }
+        }
+        
+        try _decompress(iteration: 1)
+        
+        // concatenate all the buffers together
+        if buffers.count == 1 {
+            return buffers[0]
+        } else {
+            let size = buffers.reduce(0) { return $0 + $1.readableBytes }
+            var finalBuffer = allocator.buffer(capacity: size)
+            for var buffer in buffers {
+                finalBuffer.writeBuffer(&buffer)
+            }
+            return finalBuffer
+        }
     }
     
     /// Compress one byte buffer from a stream of blocks into another bytebuffer
