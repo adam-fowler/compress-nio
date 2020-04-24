@@ -31,7 +31,7 @@ extension ByteBuffer {
     ///   - algorithm: Algorithm to use when compressing
     ///   - allocator: Byte buffer allocator used to create new byte buffer
     /// - Returns: the new byte buffer with the compressed data
-    public mutating func compress(with algorithm: CompressionAlgorithm, allocator: ByteBufferAllocator) throws -> ByteBuffer {
+    public mutating func compress(with algorithm: CompressionAlgorithm, allocator: ByteBufferAllocator = ByteBufferAllocator()) throws -> ByteBuffer {
         let compressor = algorithm.compressor
         var buffer = allocator.buffer(capacity: compressor.deflateBound(from: self))
         try compressor.deflate(from: &self, to: &buffer)
@@ -99,9 +99,8 @@ extension ByteBuffer {
     ///   - compressor: Algorithm to use when compressing
     ///   - finalise: Is this the last block
     ///   - allocator: Byte buffer allocator used to allocate the new `ByteBuffer`
-    /// - Throws: <#description#>
     /// - Returns: `ByteBuffer` containing compressed data
-    public mutating func compressStream(with compressor: NIOCompressor, finalise: Bool, allocator: ByteBufferAllocator) throws -> ByteBuffer {
+    public mutating func compressStream(with compressor: NIOCompressor, finalise: Bool, allocator: ByteBufferAllocator = ByteBufferAllocator()) throws -> ByteBuffer {
         var byteBuffer = allocator.buffer(capacity: compressor.deflateBound(from: self))
         try compressStream(to: &byteBuffer, with: compressor, finalise: finalise)
         return byteBuffer
