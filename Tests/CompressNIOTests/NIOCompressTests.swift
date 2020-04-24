@@ -53,7 +53,8 @@ class CompressNIOTests: XCTestCase {
             bufferToCompress.discardReadBytes()
         }
         var emptyBuffer = ByteBufferAllocator().buffer(capacity: 0)
-        try emptyBuffer.compressStream(to: &compressedBuffer, with: compressor, finalise: true)
+        var compressedEmptyBuffer = try emptyBuffer.compressStream(with: compressor, finalise: true)
+        compressedBuffer.writeBuffer(&compressedEmptyBuffer)
         try compressor.finishStream()
 
         // decompress
