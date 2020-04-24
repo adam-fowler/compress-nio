@@ -1,6 +1,6 @@
 import XCTest
 
-@testable import NIOCompressTests
+@testable import CompressNIOTests
 
 XCTMain([
     testCase(CompressNIOTests.allTests),
