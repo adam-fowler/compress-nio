@@ -4,14 +4,15 @@ A compression library for Swift NIO ByteBuffers.
 
 # Usage
 Swift NIO Compress contains a number of methods for compressing and decompressing `ByteBuffers`. A simple usage would be 
-```
+```swift
 var compressedBuffer = buffer.compress(with: .gzip)
 var uncompressedBuffer = buffer.uncompress(with: .gzip)
 ```
 These methods allocate a new `ByteBuffer` for you. The `uncompress` method can allocate a number of `ByteBuffers` while it is uncompressing depending on how well the original `ByteBuffer` was compressed. It if preferable to know in advance the size of buffer you need and allocate it yourself and use the following functions.
-```
+```swift
 let uncompressedSize = buffer.readableBytes
-var compressedBuffer = ByteBufferAllocator().buffer(capacity: CompressionAlgorithm.deflate.compressor.maxSize(from:buffer))
+let maxCompressedSize = CompressionAlgorithm.deflate.compressor.maxSize(from:buffer)
+var compressedBuffer = ByteBufferAllocator().buffer(capacity: maxCompressedSize)
 try buffer.compress(to: &compressedBuffer, with: .deflate)
 var uncompressedBuffer = ByteBufferAllocator().buffer(capacity: uncompressedSize)
 try compressedBuffer.decompress(to: &uncompressedBuffer, with: .deflate)
