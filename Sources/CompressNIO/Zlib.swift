@@ -180,8 +180,13 @@ class ZlibDecompressor: NIODecompressor {
             bytesWritten = self.stream.next_out - CCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
             switch rt {
             case Z_OK:
-                if self.stream.avail_out == 0 && self.stream.avail_in != 0 {
-                    throw CompressNIOError.bufferOverflow
+                if self.stream.avail_out == 0 {
+                    // in theory this isnt correct. `Inflate` could still have data to output. But in this
+                    // situation I have found if I call `inflate` again I get a `Z_DATA_ERROR`.
+                    if self.stream.avail_in != 0 {
+                        throw CompressNIOError.bufferOverflow
+                    } else {
+                    }
                 }
             case Z_BUF_ERROR:
                 throw CompressNIOError.bufferOverflow
