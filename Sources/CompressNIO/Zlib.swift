@@ -119,6 +119,18 @@ class ZlibCompressor: NIOCompressor {
         let bufferSize = Int(CCompressZlib.deflateBound(&stream, UInt(from.readableBytes)))
         return bufferSize + 6
     }
+    
+    func resetStream() throws {
+        assert(isActive)
+        // deflateReset is a more optimal than calling finish and then start
+        let rt = deflateReset(&self.stream)
+        switch rt {
+        case Z_OK:
+            break
+        default:
+            throw CompressNIOError.internalError
+        }
+    }
 }
 
 /// Decompressor using Zlib
@@ -209,6 +221,18 @@ class ZlibDecompressor: NIODecompressor {
         switch rt {
         case Z_DATA_ERROR:
             throw CompressNIOError.unfinished
+        case Z_OK:
+            break
+        default:
+            throw CompressNIOError.internalError
+        }
+    }
+    
+    func resetStream() throws {
+        assert(isActive)
+        // inflateReset is a more optimal than calling finish and then start
+        let rt = inflateReset(&self.stream)
+        switch rt {
         case Z_OK:
             break
         default:

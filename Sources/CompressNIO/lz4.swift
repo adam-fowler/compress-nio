@@ -57,12 +57,18 @@ class LZ4Compressor: NIOCompressor {
         self.dictionary = nil
     }
     
+    func resetStream() throws {
+        assert(self.stream != nil)
+        // LZ4_resetStream_fast is a more optimal than calling finish and then start
+        LZ4_resetStream_fast(stream)
+    }
+
     func maxSize(from: ByteBuffer) -> Int {
         let bufferSize = LZ4_compressBound(Int32(from.readableBytes))
         return Int(bufferSize)
     }
 
-    public func deflate(from: inout ByteBuffer, to: inout ByteBuffer) throws {
+    func deflate(from: inout ByteBuffer, to: inout ByteBuffer) throws {
         var bytesRead = 0
         var bytesWritten = 0
 
@@ -90,16 +96,16 @@ class LZ4Compressor: NIOCompressor {
 
 }
 
-public class LZ4Decompressor: NIODecompressor {
+class LZ4Decompressor: NIODecompressor {
     var stream: UnsafeMutablePointer<LZ4_streamDecode_t>?
     var lastByteBuffer: ByteBuffer?
     
-    public func startStream() throws {
+    func startStream() throws {
         assert(self.stream == nil)
         self.stream = LZ4_createStreamDecode()
     }
     
-    public func streamInflate(from: inout ByteBuffer, to: inout ByteBuffer) throws {
+    func streamInflate(from: inout ByteBuffer, to: inout ByteBuffer) throws {
         assert(self.stream != nil)
         var bytesRead = 0
         var bytesWritten = 0
@@ -130,7 +136,7 @@ public class LZ4Decompressor: NIODecompressor {
         lastByteBuffer = to
     }
     
-    public func finishStream() throws {
+    func finishStream() throws {
         assert(self.stream != nil)
         LZ4_freeStreamDecode(self.stream)
         self.stream = nil
@@ -138,7 +144,7 @@ public class LZ4Decompressor: NIODecompressor {
 
     }
     
-    public func inflate(from: inout ByteBuffer, to: inout ByteBuffer) throws {
+    func inflate(from: inout ByteBuffer, to: inout ByteBuffer) throws {
         var bytesRead = 0
         var bytesWritten = 0
 
