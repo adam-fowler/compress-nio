@@ -20,6 +20,9 @@ public protocol NIODecompressor: class {
     
     /// Finished using thie decompressor for stream decompression
     func finishStream() throws
+    
+    /// equivalent of calling `finishStream` followed by `startStream`.
+    func resetStream() throws
 }
 
 extension NIODecompressor {
@@ -28,6 +31,12 @@ extension NIODecompressor {
         try startStream()
         try streamInflate(from: &from, to: &to)
         try finishStream()
+    }
+
+    /// Default implementation of `reset`.
+    public func resetStream() throws {
+        try finishStream()
+        try startStream()
     }
 }
 
@@ -52,6 +61,9 @@ public protocol NIOCompressor: class {
     /// Finish using this compressor for stream compression
     func finishStream() throws
     
+    /// equivalent of calling `finishStream` followed by `startStream`. There maybe implementation of this that are more optimal
+    func resetStream() throws
+
     /// Return the maximum possible number of bytes required for the compressed version of a `ByteBuffer`
     /// - Parameter from: `ByteBuffer` to get maximum size for
     func maxSize(from: ByteBuffer) -> Int
@@ -63,6 +75,12 @@ extension NIOCompressor {
         try startStream()
         try streamDeflate(from: &from, to: &to, finalise: true)
         try finishStream()
+    }
+    
+    /// Default implementation of `reset`.
+    public func resetStream() throws {
+        try finishStream()
+        try startStream()
     }
 }
 

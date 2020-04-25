@@ -136,6 +136,32 @@ class CompressNIOTests: XCTestCase {
         XCTAssertEqual(buffer, uncompressedBuffer)
     }
 
+    func testReset(_ algorithm: CompressionAlgorithm) throws {
+        let bufferSize = 12000
+        let buffer = createRandomBuffer(size: bufferSize, randomness: 50)
+        var bufferToCompress = buffer
+
+        let compressor = algorithm.compressor
+        let decompressor = algorithm.decompressor
+        try compressor.startStream()
+        var compressedBuffer = try bufferToCompress.compressStream(with: compressor, finalise: true)
+        try compressor.resetStream()
+        
+        try decompressor.startStream()
+        var uncompressedBuffer = try compressedBuffer.decompressStream(with: decompressor)
+        try decompressor.resetStream()
+        
+        XCTAssertEqual(buffer, uncompressedBuffer)
+        
+        compressedBuffer = try uncompressedBuffer.compressStream(with: compressor, finalise: true)
+        try compressor.finishStream()
+        
+        uncompressedBuffer = try compressedBuffer.decompressStream(with: decompressor)
+        try decompressor.finishStream()
+        
+        XCTAssertEqual(buffer, uncompressedBuffer)
+    }
+    
     func testGZipCompressDecompress() throws {
         try testCompressDecompress(.gzip)
     }
@@ -337,6 +363,10 @@ class CompressNIOTests: XCTestCase {
         XCTAssertEqual(buffer, uncompressedBuffer)
     }
 
+    func testGZipReset() throws {
+        try testReset(.gzip)
+    }
+    
     func testLZ4Compress() throws {
         try testCompressDecompress(.lz4)
     }
@@ -355,6 +385,10 @@ class CompressNIOTests: XCTestCase {
         XCTAssertEqual(buffer, uncompressedBuffer)
     }
 
+    func testLZ4Reset() throws {
+        try testReset(.lz4)
+    }
+    
     func testPerformance(_ algorithm: CompressionAlgorithm, buffer: inout ByteBuffer) throws {
         var compressedBuffer = ByteBufferAllocator().buffer(capacity: algorithm.compressor.maxSize(from: buffer))
         var uncompressedBuffer = ByteBufferAllocator().buffer(capacity: buffer.readableBytes)
@@ -414,10 +448,13 @@ class CompressNIOTests: XCTestCase {
             ("testAllocatingDecompress", testAllocatingDecompress),
             ("testRandomAllocatingDecompress", testRandomAllocatingDecompress),
             ("testAllocatingStreamCompressDecompress", testAllocatingStreamCompressDecompress),
+            ("testGZipReset", testGZipReset),
             ("testLZ4Compress", testLZ4Compress),
             ("testLZ4StreamCompress", testLZ4StreamCompress),
             ("testLZ4AllocatingDecompress", testLZ4AllocatingDecompress),
-            ("testPerformance", testPerformance)
+            ("testLZ4Reset", testLZ4Reset),
+            ("testPerformance", testPerformance),
+            ("testBlockWithoutStreamEnd", testBlockWithoutStreamEnd)
         ]
     }
 }
