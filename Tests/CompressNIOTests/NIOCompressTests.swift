@@ -56,8 +56,12 @@ class CompressNIOTests: XCTestCase {
         let compressor = algorithm.compressor
         try compressor.startStream()
         var compressedBuffers: [ByteBuffer] = []
+        let minBlockSize = blockSize / 2
+        var blockSize = blockSize
 
         while buffer.readableBytes > 0 {
+            blockSize += Int.random(in: (-blockSize/2)..<(blockSize/2))
+            blockSize = max(blockSize, minBlockSize)
             let size = min(blockSize, buffer.readableBytes)
             var slice = buffer.readSlice(length: size)!
             var compressedSlice = try slice.compressStream(with: compressor, finalise: false)
@@ -80,7 +84,10 @@ class CompressNIOTests: XCTestCase {
         while from.readableBytes > 0 {
             let size = min(blockSize, from.readableBytes)
             var slice = from.readSlice(length: size)!
-            try slice.decompressStream(to: &to, with: decompressor)
+            var writeOutBuffer = ByteBufferAllocator().buffer(capacity: to.writableBytes)
+            try slice.decompressStream(to: &writeOutBuffer, with: decompressor)
+            to.writeBuffer(&writeOutBuffer)
+            writeOutBuffer.discardReadBytes()
             from.discardReadBytes()
         }
         try decompressor.finishStream()
@@ -90,7 +97,10 @@ class CompressNIOTests: XCTestCase {
         let decompressor = algorithm.decompressor
         try decompressor.startStream()
         for var buffer in from {
-            try buffer.decompressStream(to: &to, with: decompressor)
+            var writeOutBuffer = ByteBufferAllocator().buffer(capacity: to.writableBytes)
+            try buffer.decompressStream(to: &writeOutBuffer, with: decompressor)
+            to.writeBuffer(&writeOutBuffer)
+            writeOutBuffer.discardReadBytes()
             buffer.discardReadBytes()
         }
         try decompressor.finishStream()
