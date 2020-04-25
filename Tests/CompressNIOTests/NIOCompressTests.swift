@@ -86,7 +86,7 @@ class CompressNIOTests: XCTestCase {
         try decompressor.finishStream()
     }
 
-    func streamBlockDecompress(_ algorithm: CompressionAlgorithm, from: [ByteBuffer], to: inout ByteBuffer, blockSize: Int = 1024) throws {
+    func streamBlockDecompress(_ algorithm: CompressionAlgorithm, from: [ByteBuffer], to: inout ByteBuffer) throws {
         let decompressor = algorithm.decompressor
         try decompressor.startStream()
         for var buffer in from {
@@ -117,7 +117,7 @@ class CompressNIOTests: XCTestCase {
 
         // compress
         var bufferToCompress = buffer
-        let compressedBuffers = try streamBlockCompress(algorithm, buffer: &bufferToCompress)
+        let compressedBuffers = try streamBlockCompress(algorithm, buffer: &bufferToCompress, blockSize: blockSize)
 
         // decompress
         var uncompressedBuffer = byteBufferAllocator.buffer(capacity: bufferSize+1)

@@ -82,6 +82,7 @@ class LZ4Compressor: NIOCompressor {
 
 public class LZ4Decompressor: NIODecompressor {
     var stream: UnsafeMutablePointer<LZ4_streamDecode_t>?
+    var bufferCache = ByteBufferCache(size: 64*1024)
     
     public func startStream() throws {
         assert(self.stream == nil)
@@ -92,6 +93,8 @@ public class LZ4Decompressor: NIODecompressor {
         assert(self.stream != nil)
         var bytesRead = 0
         var bytesWritten = 0
+        
+        bufferCache.add(from)
         
         try from.withUnsafeProcess(to: &to) { fromBuffer, toBuffer in
             let rt = LZ4_decompress_safe_continue(
@@ -109,12 +112,15 @@ public class LZ4Decompressor: NIODecompressor {
         }
         to.moveWriterIndex(forwardBy: bytesWritten)
         from.moveReaderIndex(forwardBy: bytesRead)
+        
+        bufferCache.reduce()
     }
     
     public func finishStream() throws {
         assert(self.stream != nil)
         LZ4_freeStreamDecode(self.stream)
         self.stream = nil
+        self.bufferCache.empty()
     }
     
     public func inflate(from: inout ByteBuffer, to: inout ByteBuffer) throws {
@@ -136,5 +142,41 @@ public class LZ4Decompressor: NIODecompressor {
         }
         to.moveWriterIndex(forwardBy: bytesWritten)
         from.moveReaderIndex(forwardBy: bytesRead)
+    }
+}
+
+/// Keep a reference to a number ByteBuffers so they aren't deleted
+struct ByteBufferCache {
+    let size: Int
+    var buffers: [ByteBuffer]
+
+    init(size: Int) {
+        self.size = size
+        self.buffers = []
+    }
+    
+    mutating func add(_ buffer: ByteBuffer) {
+        // assert cache has grown too big ie the total size of all the blocks minus the first block is less than the cache size
+        assert(buffers.reduce(0){ $0 + $1.readableBytes } - (buffers.first?.readableBytes ?? 0) < size)
+        buffers.append(buffer)
+    }
+    
+    mutating func reduce() {
+        var count: Int = 0
+        var dropIndex: Int? = nil
+        for i in (0..<buffers.count).reversed() {
+            count += buffers[i].readableBytes
+            if count >= size {
+                dropIndex = i
+                break
+            }
+        }
+        if let dropIndex = dropIndex {
+            buffers = Array(buffers[dropIndex..<buffers.count])
+        }
+    }
+    
+    mutating func empty() {
+        buffers = []
     }
 }
