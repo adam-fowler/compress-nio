@@ -41,3 +41,21 @@ try emptyBuffer.compressStream(to: &compressedBuffer, with: compressor, finalise
 ```
 
 While streaming if the buffer you are compressing into is too small a `CompressNIO.bufferOverflow` error will be thrown. In this situation you can provide another `ByteBuffer` to receive the remains of the data. Data may have already been decompressed into your original buffer so don't throw away the original.
+
+# LZ4
+
+As well as the zlib gzip and deflate algorithms CompressNIO provides LZ4 support. LZ4 has been included because of its different characteristics to the zlib algorithms. LZ4 is considerably faster, up to 10 to 20 times faster. With that speed increase though comes a cost in compression quality and flexibility. LZ4 does not compress anywhere near as well and its streaming support is limited. Below is a table comparing the performance characteristics of gzip and LZ4 compressing and decompressing 10MB buffers of varying complexity.
+
+gzip compression ratio | gzip speed | LZ4 compression ratio | LZ4 speed
+-----------------------|------------|-----------------------|----------
+12%                    |290ms       |24%                    |19ms
+26%                    |517ms       |43%                    |23ms
+42%                    |637ms       |62%                    |24ms
+68%                    |595ms       |87%                    |24ms
+90%                    |402ms       |99%                    |12ms
+
+The reduction in flexibility comes from LZ4's inability to decompress arbitrary sized slices from a compressed buffer. Decompression has to run on the block boundaries generated at compression time. If you compressed a buffer in multiple streamed blocks you need to decompress each of those compressed blocks separately to decompress successfully. Similarly a buffer compressed in one go will not decompress as a series of streamed slices.
+
+Finally if LZ4 runs out of space while compressing or decompressing unlike the zlib algorithms all the work it has done so far is thrown away and you need to restart the process again with a bigger buffer.
+
+
