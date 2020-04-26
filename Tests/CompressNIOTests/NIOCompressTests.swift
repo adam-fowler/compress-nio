@@ -320,6 +320,7 @@ class CompressNIOTests: XCTestCase {
     }
 
     func testAllocatingStreamCompressDecompress() throws {
+        for _ in 0..<10000 {
         let algorithm: CompressionAlgorithm = .gzip
         let bufferSize = 16000
         let blockSize = 1024
@@ -352,7 +353,7 @@ class CompressNIOTests: XCTestCase {
         let decompressor = algorithm.decompressor
         try decompressor.startStream()
         while compressedBuffer.readableBytes > 0 {
-            let size = min(512, compressedBuffer.readableBytes)
+            let size = min(1024, compressedBuffer.readableBytes)
             var slice = compressedBuffer.readSlice(length: size)!
             var uncompressedBuffer2 = try slice.decompressStream(with: decompressor)
             uncompressedBuffer.writeBuffer(&uncompressedBuffer2)
@@ -361,6 +362,7 @@ class CompressNIOTests: XCTestCase {
         try decompressor.finishStream()
 
         XCTAssertEqual(buffer, uncompressedBuffer)
+        }
     }
 
     func testGZipReset() throws {

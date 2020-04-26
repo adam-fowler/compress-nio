@@ -194,12 +194,7 @@ class ZlibDecompressor: NIODecompressor {
             switch rt {
             case Z_OK:
                 if stream.avail_out == 0 {
-                    // in theory this isnt correct. `Inflate` could still have data to output. But in this
-                    // situation I have found if I call `inflate` again I get a `Z_DATA_ERROR`.
-                    if stream.avail_in != 0 {
-                        throw CompressNIOError.bufferOverflow
-                    } else {
-                    }
+                    throw CompressNIOError.bufferOverflow
                 }
             case Z_BUF_ERROR:
                 throw CompressNIOError.bufferOverflow
