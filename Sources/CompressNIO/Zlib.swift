@@ -5,12 +5,13 @@ import NIO
 /// Compressor using Zlib
 class ZlibCompressor: NIOCompressor {
     let windowBits: Int
+    var stream: z_stream
     var isActive: Bool
-    var stream = z_stream()
     var lastError: Error?
 
     init(windowBits: Int) {
         self.windowBits = windowBits
+        self.stream = z_stream()
         self.isActive = false
         self.lastError = nil
     }
@@ -29,7 +30,7 @@ class ZlibCompressor: NIOCompressor {
         stream.zfree = nil
         stream.opaque = nil
 
-        let rt = CCompressZlib_deflateInit2(&self.stream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, Int32(windowBits), 8, Z_DEFAULT_STRATEGY)
+        let rt = CCompressZlib_deflateInit2(&stream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, Int32(windowBits), 8, Z_DEFAULT_STRATEGY)
         switch rt {
         case Z_MEM_ERROR:
             throw CompressNIOError.noMoreMemory
@@ -54,22 +55,22 @@ class ZlibCompressor: NIOCompressor {
             let flag = finalise ? Z_FINISH : Z_SYNC_FLUSH
 
             if lastError == nil {
-                self.stream.avail_in = UInt32(fromBuffer.count)
+                stream.avail_in = UInt32(fromBuffer.count)
             }
-            self.stream.next_in = CCompressZlib_voidPtr_to_BytefPtr(fromBuffer.baseAddress!)
-            self.stream.avail_out = UInt32(toBuffer.count)
-            self.stream.next_out = CCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
+            stream.next_in = CCompressZlib_voidPtr_to_BytefPtr(fromBuffer.baseAddress!)
+            stream.avail_out = UInt32(toBuffer.count)
+            stream.next_out = CCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
 
             lastError = nil
-            let rt = CCompressZlib.deflate(&self.stream, flag)
-            bytesRead = self.stream.next_in - CCompressZlib_voidPtr_to_BytefPtr(fromBuffer.baseAddress!)
-            bytesWritten = self.stream.next_out - CCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
+            let rt = CCompressZlib.deflate(&stream, flag)
+            bytesRead = stream.next_in - CCompressZlib_voidPtr_to_BytefPtr(fromBuffer.baseAddress!)
+            bytesWritten = stream.next_out - CCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
             do {
                 switch rt {
                 case Z_OK:
                     if finalise == true {
                         throw CompressNIOError.bufferOverflow
-                    } else if self.stream.avail_out == 0 {
+                    } else if stream.avail_out == 0 {
                         throw CompressNIOError.bufferOverflow
                     }
                 case Z_DATA_ERROR:
@@ -94,7 +95,7 @@ class ZlibCompressor: NIOCompressor {
     func finishStream() throws {
         assert(isActive)
         isActive = false
-        let rt = deflateEnd(&self.stream)
+        let rt = deflateEnd(&stream)
         switch rt {
         case Z_OK:
             break
@@ -123,7 +124,7 @@ class ZlibCompressor: NIOCompressor {
     func resetStream() throws {
         assert(isActive)
         // deflateReset is a more optimal than calling finish and then start
-        let rt = deflateReset(&self.stream)
+        let rt = deflateReset(&stream)
         switch rt {
         case Z_OK:
             break
@@ -154,11 +155,11 @@ class ZlibDecompressor: NIODecompressor {
         assert(!isActive)
 
         // zlib docs say: The application must initialize zalloc, zfree and opaque before calling the init function.
-        self.stream.zalloc = nil
-        self.stream.zfree = nil
-        self.stream.opaque = nil
+        stream.zalloc = nil
+        stream.zfree = nil
+        stream.opaque = nil
 
-        let rt = CCompressZlib_inflateInit2(&self.stream, Int32(windowBits))
+        let rt = CCompressZlib_inflateInit2(&stream, Int32(windowBits))
         switch rt {
         case Z_MEM_ERROR:
             throw CompressNIOError.noMoreMemory
@@ -181,21 +182,21 @@ class ZlibDecompressor: NIODecompressor {
         }
 
         try from.withUnsafeProcess(to: &to) { fromBuffer, toBuffer in
-            self.stream.avail_in = UInt32(fromBuffer.count)
-            self.stream.next_in = CCompressZlib_voidPtr_to_BytefPtr(fromBuffer.baseAddress!)
-            self.stream.avail_out = UInt32(toBuffer.count)
-            self.stream.next_out = CCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
+            stream.avail_in = UInt32(fromBuffer.count)
+            stream.next_in = CCompressZlib_voidPtr_to_BytefPtr(fromBuffer.baseAddress!)
+            stream.avail_out = UInt32(toBuffer.count)
+            stream.next_out = CCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
 
-            let rt = CCompressZlib.inflate(&self.stream, Z_NO_FLUSH)
+            let rt = CCompressZlib.inflate(&stream, Z_NO_FLUSH)
 
-            bytesRead = self.stream.next_in - CCompressZlib_voidPtr_to_BytefPtr(fromBuffer.baseAddress!)
-            bytesWritten = self.stream.next_out - CCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
+            bytesRead = stream.next_in - CCompressZlib_voidPtr_to_BytefPtr(fromBuffer.baseAddress!)
+            bytesWritten = stream.next_out - CCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
             switch rt {
             case Z_OK:
-                if self.stream.avail_out == 0 {
+                if stream.avail_out == 0 {
                     // in theory this isnt correct. `Inflate` could still have data to output. But in this
                     // situation I have found if I call `inflate` again I get a `Z_DATA_ERROR`.
-                    if self.stream.avail_in != 0 {
+                    if stream.avail_in != 0 {
                         throw CompressNIOError.bufferOverflow
                     } else {
                     }
@@ -217,7 +218,7 @@ class ZlibDecompressor: NIODecompressor {
     func finishStream() throws {
         assert(isActive)
         isActive = false
-        let rt = inflateEnd(&self.stream)
+        let rt = inflateEnd(&stream)
         switch rt {
         case Z_DATA_ERROR:
             throw CompressNIOError.unfinished
@@ -231,7 +232,7 @@ class ZlibDecompressor: NIODecompressor {
     func resetStream() throws {
         assert(isActive)
         // inflateReset is a more optimal than calling finish and then start
-        let rt = inflateReset(&self.stream)
+        let rt = inflateReset(&stream)
         switch rt {
         case Z_OK:
             break

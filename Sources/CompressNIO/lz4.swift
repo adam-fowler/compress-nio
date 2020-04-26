@@ -10,14 +10,20 @@ class LZ4Compressor: NIOCompressor {
         stream = nil
     }
     
+    deinit {
+        if stream != nil {
+            try? finishStream()
+        }
+    }
+
     func startStream() throws {
-        assert(self.stream == nil)
-        self.stream = LZ4_createStream()
+        assert(stream == nil)
+        stream = LZ4_createStream()
         self.dictionary = ByteBufferAllocator().buffer(capacity: 64*1024)
     }
     
     func streamDeflate(from: inout ByteBuffer, to: inout ByteBuffer, finalise: Bool) throws {
-        assert(self.stream != nil) 
+        assert(stream != nil)
         var bytesRead = 0
         var bytesWritten = 0
         
@@ -51,14 +57,14 @@ class LZ4Compressor: NIOCompressor {
     }
     
     func finishStream() throws {
-        assert(self.stream != nil)
+        assert(stream != nil)
         LZ4_freeStream(stream)
-        self.stream = nil
+        stream = nil
         self.dictionary = nil
     }
     
     func resetStream() throws {
-        assert(self.stream != nil)
+        assert(stream != nil)
         // LZ4_resetStream_fast is a more optimal than calling finish and then start
         LZ4_resetStream_fast(stream)
     }
@@ -100,13 +106,19 @@ class LZ4Decompressor: NIODecompressor {
     var stream: UnsafeMutablePointer<LZ4_streamDecode_t>?
     var lastByteBuffer: ByteBuffer?
     
+    deinit {
+        if stream != nil {
+            try? finishStream()
+        }
+    }
+
     func startStream() throws {
-        assert(self.stream == nil)
-        self.stream = LZ4_createStreamDecode()
+        assert(stream == nil)
+        stream = LZ4_createStreamDecode()
     }
     
     func streamInflate(from: inout ByteBuffer, to: inout ByteBuffer) throws {
-        assert(self.stream != nil)
+        assert(stream != nil)
         var bytesRead = 0
         var bytesWritten = 0
         
@@ -137,9 +149,9 @@ class LZ4Decompressor: NIODecompressor {
     }
     
     func finishStream() throws {
-        assert(self.stream != nil)
-        LZ4_freeStreamDecode(self.stream)
-        self.stream = nil
+        assert(stream != nil)
+        LZ4_freeStreamDecode(stream)
+        stream = nil
         self.lastByteBuffer = nil
 
     }
