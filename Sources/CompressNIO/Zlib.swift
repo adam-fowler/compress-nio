@@ -105,8 +105,10 @@ class ZlibCompressor: NIOCompressor {
         // (00 00 ff ff)."
         // As we use avail_out == 0 as an indicator of whether the deflate was complete. I also add an extra byte to ensure we
         // always have at least one byte left in the compressed buffer after the deflate has completed.
+        //
+        // as we are using Z_NO_FLUSH we can assume deflateBound returns the size we require
         let bufferSize = Int(CCompressZlib.deflateBound(&stream, UInt(from.readableBytes)))
-        return bufferSize + 6
+        return bufferSize
     }
     
     func resetStream() throws {
