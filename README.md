@@ -42,8 +42,6 @@ try emptyBuffer.compressStream(to: &compressedBuffer, with: compressor, finalise
 
 While streaming if the buffer you are compressing into is too small a `CompressNIO.bufferOverflow` error will be thrown. In this situation you can provide another `ByteBuffer` to receive the remains of the data. Data may have already been decompressed into your original buffer so don't throw away the original.
 
-It doesn't appear to be documented but zlib doesn't always cope with slices smaller than 1K so try to keep your slices to greater than 1K when decompressing a stream.
-
 # LZ4
 
 As well as the zlib gzip and deflate algorithms CompressNIO provides LZ4 support. LZ4 has been included because of its different characteristics to the zlib algorithms. LZ4 is considerably faster, up to 10 to 20 times faster. With that speed increase though comes a cost in compression quality and flexibility. LZ4 does not compress anywhere near as well and its streaming support is limited. Below is a table comparing the performance characteristics of gzip and LZ4 compressing and decompressing 10MB buffers of varying complexity.
