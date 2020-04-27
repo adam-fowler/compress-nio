@@ -7,13 +7,11 @@ class ZlibCompressor: NIOCompressor {
     let windowBits: Int
     var stream: z_stream
     var isActive: Bool
-    var lastError: Error?
 
     init(windowBits: Int) {
         self.windowBits = windowBits
         self.stream = z_stream()
         self.isActive = false
-        self.lastError = nil
     }
 
     deinit {
@@ -49,47 +47,37 @@ class ZlibCompressor: NIOCompressor {
 
         defer {
             to.moveWriterIndex(forwardBy: bytesWritten)
+            from.moveReaderIndex(forwardBy: bytesRead)
         }
 
         try from.withUnsafeProcess(to: &to) { fromBuffer, toBuffer in
-            let flag = finalise ? Z_FINISH : Z_SYNC_FLUSH
+            let flag = finalise ? Z_FINISH : Z_NO_FLUSH
 
-            if lastError == nil {
-                stream.avail_in = UInt32(fromBuffer.count)
-            }
+            stream.avail_in = UInt32(fromBuffer.count)
             stream.next_in = CCompressZlib_voidPtr_to_BytefPtr(fromBuffer.baseAddress!)
             stream.avail_out = UInt32(toBuffer.count)
             stream.next_out = CCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
 
-            lastError = nil
             let rt = CCompressZlib.deflate(&stream, flag)
             bytesRead = stream.next_in - CCompressZlib_voidPtr_to_BytefPtr(fromBuffer.baseAddress!)
             bytesWritten = stream.next_out - CCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
-            do {
-                switch rt {
-                case Z_OK:
-                    if finalise == true {
-                        throw CompressNIOError.bufferOverflow
-                    } else if stream.avail_out == 0 {
-                        throw CompressNIOError.bufferOverflow
-                    }
-                case Z_DATA_ERROR:
-                    throw CompressNIOError.corruptData
-                case Z_BUF_ERROR:
+            switch rt {
+            case Z_OK:
+                if finalise == true {
                     throw CompressNIOError.bufferOverflow
-                case Z_MEM_ERROR:
-                    throw CompressNIOError.noMoreMemory
-                case Z_STREAM_END:
-                    break
-                default:
-                    throw CompressNIOError.internalError
                 }
-            } catch {
-                lastError = error
-                throw error
+            case Z_DATA_ERROR:
+                throw CompressNIOError.corruptData
+            case Z_BUF_ERROR:
+                throw CompressNIOError.bufferOverflow
+            case Z_MEM_ERROR:
+                throw CompressNIOError.noMoreMemory
+            case Z_STREAM_END:
+                break
+            default:
+                throw CompressNIOError.internalError
             }
         }
-        from.moveReaderIndex(forwardBy: bytesRead)
     }
 
     func finishStream() throws {
@@ -158,6 +146,8 @@ class ZlibDecompressor: NIODecompressor {
         stream.zalloc = nil
         stream.zfree = nil
         stream.opaque = nil
+        stream.avail_in = 0;
+        stream.next_in = nil;
 
         let rt = CCompressZlib_inflateInit2(&stream, Int32(windowBits))
         switch rt {
