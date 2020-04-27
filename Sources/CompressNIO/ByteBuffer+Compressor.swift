@@ -129,6 +129,33 @@ extension ByteBuffer {
         }
     }
     
+    /// A version of decompressStream which you provide a fixed sized window buffer to and a process closure. When the window buffer is full the process
+    /// closure is called. If there is any unprocessed data left at the end of the compress the process closure is called with this.
+    ///
+    /// This function will not work with the LZ4 compressor
+    ///
+    /// - Parameters:
+    ///   - compressor: Algorithm to use when decompressing
+    ///   - window: Window Byte buffer allocator used to write decompressed data into
+    ///   - process: Closure to be called when window buffer fills up or decompress has finished
+    /// - Returns: `ByteBuffer` containing compressed data
+    public mutating func decompressStream(with decompressor: NIODecompressor, window: ByteBuffer, process: (ByteBuffer)->()) throws {
+        var window = window
+        while self.readableBytes > 0 {
+            do {
+                try decompressStream(to: &window, with: decompressor)
+            } catch let error as CompressNIOError where error == .bufferOverflow {
+                process(window)
+                window.moveReaderIndex(to: 0)
+                window.moveWriterIndex(to: 0)
+            }
+        }
+
+        if window.readableBytes > 0 {
+            process(window)
+        }
+    }
+
     /// Compress one byte buffer from a stream of blocks into another bytebuffer
     ///
     /// The compress stream functions work with a stream of data. You create a `NIOCompressor`, call `startStream` on it and then for each
@@ -145,8 +172,10 @@ extension ByteBuffer {
     ///  try decompressor.finishStream()
     ///  ````
     ///
-    ///  If a `bufferOverflow` error is thrown you can supply a larger buffer and call the `compressStream` again. Remember though the `ByteBuffer`
-    ///  you were writing into from the original call could have some decompressed data in it still so don't throw it away.
+    ///  If you call this function without `finalise` set it will return if some data has been processed. Unless you are certain you have provided a
+    ///  output buffer large enough you should to see if your input buffer has any `readableBytes` left and call the function again if there are any.
+    ///  If a `bufferOverflow` error is thrown you need to supply a larger buffer and call the `compressStream` again. Remember though the
+    ///  `ByteBuffer` you were writing into from the original call could have some decompressed data in it still so don't throw it away.
     ///
     /// - Parameters:
     ///   - byteBuffer: byte buffer block from a large byte buffer
@@ -159,16 +188,63 @@ extension ByteBuffer {
     }
     
     /// A version of compressStream which allocates the ByteBuffer to write into.
+    ///
+    /// If you call this on a ByteBuffer that has already had `compressStream` called the buffer calculation might be inaccurate and a `bufferOverflow` error
+    /// could be thrown.
+    ///
     /// - Parameters:
     ///   - compressor: Algorithm to use when compressing
     ///   - finalise: Is this the last block
     ///   - allocator: Byte buffer allocator used to allocate the new `ByteBuffer`
+    /// - Throws:
+    ///     - `NIOCompression.Error.bufferOverflow` if the allocated byte buffer doesn't have enough space to write the decompressed data into
     /// - Returns: `ByteBuffer` containing compressed data
     public mutating func compressStream(with compressor: NIOCompressor, finalise: Bool, allocator: ByteBufferAllocator = ByteBufferAllocator()) throws -> ByteBuffer {
         var byteBuffer = allocator.buffer(capacity: compressor.maxSize(from: self))
         try compressStream(to: &byteBuffer, with: compressor, finalise: finalise)
         return byteBuffer
         
+    }
+    
+    /// A version of compressStream which you provide a fixed sized window buffer to and a process closure. When the window buffer is full the process
+    /// closure is called. If there is any unprocessed data left at the end of the compress the process closure is called with this.
+    ///
+    /// This function will not work with the LZ4 compressor
+    ///
+    /// - Parameters:
+    ///   - compressor: Algorithm to use when compressing
+    ///   - finalise: Is this the last block
+    ///   - window: Window Byte buffer allocator used to write compressed data into
+    ///   - process: Closure to be called when window buffer fills up or compress has finished
+    /// - Returns: `ByteBuffer` containing compressed data
+    public mutating func compressStream(with compressor: NIOCompressor, finalise: Bool, window: ByteBuffer, process: (ByteBuffer)->()) throws {
+        var window = window
+        while self.readableBytes > 0 {
+            do {
+                try compressStream(to: &window, with: compressor, finalise: false)
+            } catch let error as CompressNIOError where error == .bufferOverflow {
+                process(window)
+                window.moveReaderIndex(to: 0)
+                window.moveWriterIndex(to: 0)
+            }
+        }
+        
+        if finalise {
+            while true {
+                do {
+                    try compressStream(to: &window, with: compressor, finalise: true)
+                    break
+                } catch let error as CompressNIOError where error == .bufferOverflow {
+                    process(window)
+                    window.moveReaderIndex(to: 0)
+                    window.moveWriterIndex(to: 0)
+                }
+            }
+        }
+        
+        if window.readableBytes > 0 {
+            process(window)
+        }
     }
 }
 
