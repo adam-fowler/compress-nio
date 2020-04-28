@@ -30,14 +30,15 @@ let compressedBuffer = ByteBufferAllocator().buffer(capacity: sizeOfCompressedDa
 let compressor = CompressionAlgorithm.gzip.compressor
 try compressor.startStream()
 while buffer = getSlice() {
-    try buffer.compressStream(to: &compressedBuffer, with: compressor, finalise: isLastBuffer)
+    let flush: CompressNIOFlush = isThisTheLastSlice ? .finish : .no
+    try buffer.compressStream(to: &compressedBuffer, with: compressor, flush: flush)
 }
 try compressor.finishStream()
 ```
-This will compress data you are receiving via `getSlice` and output all of it into `compressedBuffer`. The last slice you compress you need to call with the `finalise` parameter set to true. If you don't know at that point that you have just received your last slice you can call at the end `compressStream` on an empty `ByteBuffer` like this
+This will compress data you are receiving via the `getSlice` function and output all of it into `compressedBuffer`. The last slice you compress you need to call with the `flush` parameter set to `.finish`. If you don't know at that point that you have just received your last slice you can call at the end `compressStream` on an empty `ByteBuffer` like this
 ```swift
 var emptyBuffer = ByteBufferAllocator().buffer(capacity: 0)
-try emptyBuffer.compressStream(to: &compressedBuffer, with: compressor, finalise: true)
+try emptyBuffer.compressStream(to: &compressedBuffer, with: compressor, flush: .finish)
 ```
 
 While streaming if the buffer you are compressing into is too small a `CompressNIO.bufferOverflow` error will be thrown. In this situation you can provide another `ByteBuffer` to receive the remains of the data. Data may have already been decompressed into your original buffer so don't throw away the original.

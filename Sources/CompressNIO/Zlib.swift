@@ -40,7 +40,7 @@ class ZlibCompressor: NIOCompressor {
         isActive = true
     }
 
-    func streamDeflate(from: inout ByteBuffer, to: inout ByteBuffer, finalise: Bool) throws {
+    func streamDeflate(from: inout ByteBuffer, to: inout ByteBuffer, flush: CompressNIOFlush) throws {
         assert(isActive)
         var bytesRead = 0
         var bytesWritten = 0
@@ -51,7 +51,15 @@ class ZlibCompressor: NIOCompressor {
         }
 
         try from.withUnsafeProcess(to: &to) { fromBuffer, toBuffer in
-            let flag = finalise ? Z_FINISH : Z_NO_FLUSH
+            let flag: Int32
+            switch flush {
+            case .no:
+                flag = Z_NO_FLUSH
+            case .sync:
+                flag = Z_SYNC_FLUSH
+            case .finish:
+                flag = Z_FINISH
+            }
 
             stream.avail_in = UInt32(fromBuffer.count)
             stream.next_in = CCompressZlib_voidPtr_to_BytefPtr(fromBuffer.baseAddress!)
@@ -63,7 +71,7 @@ class ZlibCompressor: NIOCompressor {
             bytesWritten = stream.next_out - CCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
             switch rt {
             case Z_OK:
-                if finalise == true {
+                if flush == .finish {
                     throw CompressNIOError.bufferOverflow
                 }
             case Z_DATA_ERROR:
@@ -103,12 +111,8 @@ class ZlibCompressor: NIOCompressor {
         // some compression algorithms and so it should be used only when necessary. This completes the current deflate block and
         // follows it with an empty stored block that is three bits plus filler bits to the next byte, followed by four bytes
         // (00 00 ff ff)."
-        // As we use avail_out == 0 as an indicator of whether the deflate was complete. I also add an extra byte to ensure we
-        // always have at least one byte left in the compressed buffer after the deflate has completed.
-        //
-        // as we are using Z_NO_FLUSH we can assume deflateBound returns the size we require
         let bufferSize = Int(CCompressZlib.deflateBound(&stream, UInt(from.readableBytes)))
-        return bufferSize
+        return bufferSize + 5
     }
     
     func resetStream() throws {

@@ -40,6 +40,16 @@ extension NIODecompressor {
     }
 }
 
+/// how should compressor flush output data
+public enum CompressNIOFlush {
+    /// let compressor decide how much data should be flushed to the output buffer
+    case no
+    /// ensure all data that has been read has been flushed
+    case sync
+    /// finish compressing and do a full flush
+    case finish
+}
+
 /// Protocol for compressor
 public protocol NIOCompressor: class {
     /// Compress byte buffer to another byte buffer
@@ -55,8 +65,8 @@ public protocol NIOCompressor: class {
     /// - Parameters:
     ///   - from: source byte buffer
     ///   - to: destination byte buffer
-    ///   - finalise: Is this the final block to compress
-    func streamDeflate(from: inout ByteBuffer, to: inout ByteBuffer, finalise: Bool) throws
+    ///   - flush: how compressor should flush output data.
+    func streamDeflate(from: inout ByteBuffer, to: inout ByteBuffer, flush: CompressNIOFlush) throws
     
     /// Finish using this compressor for stream compression
     func finishStream() throws
@@ -73,7 +83,7 @@ extension NIOCompressor {
     /// default version of `deflate`:  start stream, compress one bufferm, finish stream
     public func deflate(from: inout ByteBuffer, to: inout ByteBuffer) throws {
         try startStream()
-        try streamDeflate(from: &from, to: &to, finalise: true)
+        try streamDeflate(from: &from, to: &to, flush: .finish)
         try finishStream()
     }
     

@@ -159,20 +159,20 @@ extension ByteBuffer {
     /// Compress one byte buffer from a stream of blocks into another bytebuffer
     ///
     /// The compress stream functions work with a stream of data. You create a `NIOCompressor`, call `startStream` on it and then for each
-    /// chunk of data in the stream you call `compressStream`. Your last block should be called with the `finalised` parameter set to true. Once
+    /// chunk of data in the stream you call `compressStream`. Your last block should be called with the `flush` parameter set to `.finish`. Once
     /// you are complete call `endStream`.
     ///  eg
     ///  ```
     ///  let compressor = NIOCompression.Algorithm.gzip.compressor
     ///  try compressor.startStream()
-    ///  try inputBuffer1.compressStream(to: &outputBuffer, with: compressor, finalise: false)
-    ///  try inputBuffer2.compressStream(to: &outputBuffer, with: compressor, finalise: false)
+    ///  try inputBuffer1.compressStream(to: &outputBuffer, with: compressor, flush: .no)
+    ///  try inputBuffer2.compressStream(to: &outputBuffer, with: compressor, flush: .no)
     ///  ...
-    ///  try inputBufferN.compressStream(to: &outputBuffer, with: compressor, finalise: true)
+    ///  try inputBufferN.compressStream(to: &outputBuffer, with: compressor, flush: .finish)
     ///  try decompressor.finishStream()
     ///  ````
     ///
-    ///  If you call this function without `finalise` set it will return if some data has been processed. Unless you are certain you have provided a
+    ///  If you call this function without `flush` set to `.finish` it will return if some data has been processed. Unless you are certain you have provided a
     ///  output buffer large enough you should to see if your input buffer has any `readableBytes` left and call the function again if there are any.
     ///  If a `bufferOverflow` error is thrown you need to supply a larger buffer and call the `compressStream` again. Remember though the
     ///  `ByteBuffer` you were writing into from the original call could have some decompressed data in it still so don't throw it away.
@@ -180,28 +180,29 @@ extension ByteBuffer {
     /// - Parameters:
     ///   - byteBuffer: byte buffer block from a large byte buffer
     ///   - compressor: Algorithm to use when compressing
-    ///   - finalise: Is this the last block
+    ///   - flush: how compressor should flush output data.
     /// - Throws:
     ///     - `NIOCompression.Error.bufferOverflow` if output byte buffer doesn't have enough space to write the compressed data into
-    public mutating func compressStream(to byteBuffer: inout ByteBuffer, with compressor: NIOCompressor, finalise: Bool) throws {
-        try compressor.streamDeflate(from: &self, to: &byteBuffer, finalise: finalise)
+    public mutating func compressStream(to byteBuffer: inout ByteBuffer, with compressor: NIOCompressor, flush: CompressNIOFlush) throws {
+        try compressor.streamDeflate(from: &self, to: &byteBuffer, flush: flush)
     }
     
     /// A version of compressStream which allocates the ByteBuffer to write into.
     ///
-    /// If you call this on a ByteBuffer that has already had `compressStream` called the buffer calculation might be inaccurate and a `bufferOverflow` error
-    /// could be thrown.
+    /// If you call this after a call to another `compressStream` this cannot accurately calculate the size of the buffer required to compress into unless
+    /// the previous call to `compressStream` was called with `flush` set to `.sync`. If the buffer calculation is inaccurate a `.bufferOverflow`
+    /// error is thrown.
     ///
     /// - Parameters:
     ///   - compressor: Algorithm to use when compressing
-    ///   - finalise: Is this the last block
+    ///   - flush: how compressor should flush output data.
     ///   - allocator: Byte buffer allocator used to allocate the new `ByteBuffer`
     /// - Throws:
     ///     - `NIOCompression.Error.bufferOverflow` if the allocated byte buffer doesn't have enough space to write the decompressed data into
     /// - Returns: `ByteBuffer` containing compressed data
-    public mutating func compressStream(with compressor: NIOCompressor, finalise: Bool, allocator: ByteBufferAllocator = ByteBufferAllocator()) throws -> ByteBuffer {
+    public mutating func compressStream(with compressor: NIOCompressor, flush: CompressNIOFlush, allocator: ByteBufferAllocator = ByteBufferAllocator()) throws -> ByteBuffer {
         var byteBuffer = allocator.buffer(capacity: compressor.maxSize(from: self))
-        try compressStream(to: &byteBuffer, with: compressor, finalise: finalise)
+        try compressStream(to: &byteBuffer, with: compressor, flush: flush)
         return byteBuffer
         
     }
@@ -213,15 +214,15 @@ extension ByteBuffer {
     ///
     /// - Parameters:
     ///   - compressor: Algorithm to use when compressing
-    ///   - finalise: Is this the last block
+    ///   - flush: how compressor should flush output data.
     ///   - window: Window Byte buffer allocator used to write compressed data into
     ///   - process: Closure to be called when window buffer fills up or compress has finished
     /// - Returns: `ByteBuffer` containing compressed data
-    public mutating func compressStream(with compressor: NIOCompressor, finalise: Bool, window: ByteBuffer, process: (ByteBuffer)->()) throws {
+    public mutating func compressStream(with compressor: NIOCompressor, flush: CompressNIOFlush, window: ByteBuffer, process: (ByteBuffer)->()) throws {
         var window = window
         while self.readableBytes > 0 {
             do {
-                try compressStream(to: &window, with: compressor, finalise: false)
+                try compressStream(to: &window, with: compressor, flush: .no)
             } catch let error as CompressNIOError where error == .bufferOverflow {
                 process(window)
                 window.moveReaderIndex(to: 0)
@@ -229,10 +230,21 @@ extension ByteBuffer {
             }
         }
         
-        if finalise {
+        if flush == .sync {
             while true {
                 do {
-                    try compressStream(to: &window, with: compressor, finalise: true)
+                    try compressStream(to: &window, with: compressor, flush: .sync)
+                    break
+                } catch let error as CompressNIOError where error == .bufferOverflow {
+                    process(window)
+                    window.moveReaderIndex(to: 0)
+                    window.moveWriterIndex(to: 0)
+                }
+            }
+        } else if flush == .finish {
+            while true {
+                do {
+                    try compressStream(to: &window, with: compressor, flush: .finish)
                     break
                 } catch let error as CompressNIOError where error == .bufferOverflow {
                     process(window)

@@ -66,14 +66,14 @@ class CompressNIOTests: XCTestCase {
         while buffer.readableBytes > 0 {
             let size = min(blockSize, buffer.readableBytes)
             var slice = buffer.readSlice(length: size)!
-            var compressedSlice = try slice.compressStream(with: compressor, finalise: false)
+            var compressedSlice = try slice.compressStream(with: compressor, flush: .no)
             compressedBuffer.writeBuffer(&compressedSlice)
             compressedSlice.discardReadBytes()
             buffer.discardReadBytes()
         }
         var emptyBuffer = ByteBufferAllocator().buffer(capacity: 0)
 //        var compressedEmptyBuffer = ByteBufferAllocator().buffer(capacity: 16000)
-        try emptyBuffer.compressStream(to:&compressedBuffer, with: compressor, finalise: true)
+        try emptyBuffer.compressStream(to:&compressedBuffer, with: compressor, flush: .finish)
 //        compressedBuffer.writeBuffer(&compressedEmptyBuffer)
         try compressor.finishStream()
         return compressedBuffer
@@ -91,13 +91,13 @@ class CompressNIOTests: XCTestCase {
             blockSize = max(blockSize, minBlockSize)
             let size = min(blockSize, buffer.readableBytes)
             var slice = buffer.readSlice(length: size)!
-            var compressedSlice = try slice.compressStream(with: compressor, finalise: false)
+            var compressedSlice = try slice.compressStream(with: compressor, flush: .no)
             compressedBuffers.append(compressedSlice)
             compressedSlice.discardReadBytes()
             buffer.discardReadBytes()
         }
         var emptyBuffer = ByteBufferAllocator().buffer(capacity: 0)
-        let compressedEmptyBlock = try emptyBuffer.compressStream(with: compressor, finalise: true)
+        let compressedEmptyBlock = try emptyBuffer.compressStream(with: compressor, flush: .finish)
         compressedBuffers.append(compressedEmptyBlock)
         try compressor.finishStream()
 
@@ -171,7 +171,7 @@ class CompressNIOTests: XCTestCase {
         let compressor = algorithm.compressor
         let decompressor = algorithm.decompressor
         try compressor.startStream()
-        var compressedBuffer = try bufferToCompress.compressStream(with: compressor, finalise: true)
+        var compressedBuffer = try bufferToCompress.compressStream(with: compressor, flush: .finish)
         try compressor.resetStream()
         
         try decompressor.startStream()
@@ -180,7 +180,7 @@ class CompressNIOTests: XCTestCase {
         
         XCTAssertEqual(buffer, uncompressedBuffer)
         
-        compressedBuffer = try uncompressedBuffer.compressStream(with: compressor, finalise: true)
+        compressedBuffer = try uncompressedBuffer.compressStream(with: compressor, flush: .finish)
         try compressor.finishStream()
         
         uncompressedBuffer = try compressedBuffer.decompressStream(with: decompressor)
@@ -201,9 +201,9 @@ class CompressNIOTests: XCTestCase {
 
         while bufferToCompress.readableBytes > 0 {
             let size = min(bufferToCompress.readableBytes, streamBufferSize)
-            let finalise = bufferToCompress.readableBytes - size == 0
+            let flush: CompressNIOFlush = bufferToCompress.readableBytes - size == 0 ? .finish : .no
             var slice = bufferToCompress.readSlice(length: size)!
-            try slice.compressStream(with: compressor, finalise: finalise, window: window) { window in
+            try slice.compressStream(with: compressor, flush: flush, window: window) { window in
                 var window = window
                 compressedBuffer.writeBuffer(&window)
             }
@@ -277,8 +277,8 @@ class CompressNIOTests: XCTestCase {
         var outputBuffer2 = ByteBufferAllocator().buffer(capacity: compressor2.maxSize(from: bufferToCompress2))
         try compressor.startStream()
         try compressor2.startStream()
-        try bufferToCompress.compressStream(to: &outputBuffer, with: compressor, finalise: true)
-        try bufferToCompress2.compressStream(to: &outputBuffer2, with: compressor2, finalise: true)
+        try bufferToCompress.compressStream(to: &outputBuffer, with: compressor, flush: .finish)
+        try bufferToCompress2.compressStream(to: &outputBuffer2, with: compressor2, flush: .finish)
         try compressor.finishStream()
         try compressor2.finishStream()
         var uncompressedBuffer = ByteBufferAllocator().buffer(capacity: 1024)
@@ -320,7 +320,7 @@ class CompressNIOTests: XCTestCase {
         do {
             let compressor = CompressionAlgorithm.gzip.compressor
             try compressor.startStream()
-            try buffer.compressStream(to: &outputBuffer, with: compressor, finalise: true)
+            try buffer.compressStream(to: &outputBuffer, with: compressor, flush: .finish)
             XCTFail("Shouldn't get here")
         } catch let error as CompressNIOError where error == CompressNIOError.bufferOverflow {
         } catch {
@@ -335,11 +335,11 @@ class CompressNIOTests: XCTestCase {
         try compressor.startStream()
         var compressedBuffer = ByteBufferAllocator().buffer(capacity: 2048)
         do {
-            try bufferToCompress.compressStream(to: &compressedBuffer, with: compressor, finalise: true)
+            try bufferToCompress.compressStream(to: &compressedBuffer, with: compressor, flush: .finish)
             XCTFail("Shouldn't get here")
         } catch let error as CompressNIOError where error == CompressNIOError.bufferOverflow {
             var compressedBuffer2 = ByteBufferAllocator().buffer(capacity: 2048)
-            try bufferToCompress.compressStream(to: &compressedBuffer2, with: compressor, finalise: true)
+            try bufferToCompress.compressStream(to: &compressedBuffer2, with: compressor, flush: .finish)
             try compressor.finishStream()
             compressedBuffer.writeBuffer(&compressedBuffer2)
             var outputBuffer = ByteBufferAllocator().buffer(capacity: 5041)
@@ -355,7 +355,7 @@ class CompressNIOTests: XCTestCase {
         let compressor = CompressionAlgorithm.deflate.compressor
         try compressor.startStream()
         var compressedBuffer = ByteBufferAllocator().buffer(capacity: 4096)
-        try bufferToCompress.compressStream(to: &compressedBuffer, with: compressor, finalise: true)
+        try bufferToCompress.compressStream(to: &compressedBuffer, with: compressor, flush: .finish)
     }
 
     func testDecompressWithOverflowError() {
@@ -423,13 +423,11 @@ class CompressNIOTests: XCTestCase {
         var compressedBuffer = ByteBufferAllocator().buffer(capacity: compressor.maxSize(from: bufferToCompress))
 
         while bufferToCompress.readableBytes > 0 {
-            if blockSize < bufferToCompress.readableBytes {
-                var slice = bufferToCompress.readSlice(length: blockSize)!
-                try slice.compressStream(to: &compressedBuffer, with: compressor, finalise: false)
-            } else {
-                var slice = bufferToCompress.readSlice(length: bufferToCompress.readableBytes)!
-                try slice.compressStream(to: &compressedBuffer, with: compressor, finalise: true)
-            }
+            let size = min(blockSize, bufferToCompress.readableBytes)
+            let flush: CompressNIOFlush = bufferToCompress.readableBytes - size == 0 ? .finish : .sync
+            var slice = bufferToCompress.readSlice(length: size)!
+            var compressedSlice = try slice.compressStream(with: compressor, flush: flush)
+            compressedBuffer.writeBuffer(&compressedSlice)
             bufferToCompress.discardReadBytes()
         }
         try compressor.finishStream()

@@ -22,7 +22,7 @@ class LZ4Compressor: NIOCompressor {
         self.dictionary = ByteBufferAllocator().buffer(capacity: 64*1024)
     }
     
-    func streamDeflate(from: inout ByteBuffer, to: inout ByteBuffer, finalise: Bool) throws {
+    func streamDeflate(from: inout ByteBuffer, to: inout ByteBuffer, flush: CompressNIOFlush) throws {
         assert(stream != nil)
         var bytesRead = 0
         var bytesWritten = 0
