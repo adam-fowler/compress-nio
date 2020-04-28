@@ -32,9 +32,9 @@ There are three methods for doing stream compressing: window, allocating and raw
 For the window method you provide a working buffer for the compressor to use. When you call `compressStream` it compresses into this buffer and when the buffer is full it will call a `process` closure you have provided.
 ```swift
 let compressor = CompressionAlgorithm.gzip.compressor
-compressor.window = ByteBufferAllocator().buffer(64*1024)
+compressor.window = ByteBufferAllocator().buffer(capacity: 64*1024)
 try compressor.startStream()
-try compressor.compressStream(with: compressor, flush: .final) { buffer in
+try compressor.compressStream(with: compressor, flush: .finish) { buffer in
     // process your compressed data
 }
 try compressor.finishStream()
@@ -44,7 +44,7 @@ With the allocating method you leave the compressor to allocate the ByteBuffers 
 ```swift
 let compressor = CompressionAlgorithm.gzip.compressor
 try compressor.startStream()
-while buffer = getData() {
+while var buffer = getData() {
     let flush: CompressNIOFlush = isThisTheFinalBlock ? .finish : .sync
     let compressedBuffer = try buffer.compressStream(with: compressor, flush: flush, allocator: ByteBufferAllocator())
 }
