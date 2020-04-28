@@ -91,7 +91,7 @@ class CompressNIOTests: XCTestCase {
             blockSize = max(blockSize, minBlockSize)
             let size = min(blockSize, buffer.readableBytes)
             var slice = buffer.readSlice(length: size)!
-            var compressedSlice = try slice.compressStream(with: compressor, flush: .no)
+            var compressedSlice = try slice.compressStream(with: compressor, flush: .sync)
             compressedBuffers.append(compressedSlice)
             compressedSlice.discardReadBytes()
             buffer.discardReadBytes()
@@ -255,7 +255,15 @@ class CompressNIOTests: XCTestCase {
     }
 
     func testDeflateStreamCompressDecompress() throws {
+        try testBlockStreamCompressDecompress(.deflate)
+    }
+
+    func testDeflateBlockStreamCompressDecompress() throws {
         try testStreamCompressDecompress(.deflate)
+    }
+
+    func testGZipBlockStreamCompressDecompress() throws {
+        try testBlockStreamCompressDecompress(.gzip)
     }
 
     func testCompressWithWindow() throws {
