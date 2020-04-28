@@ -10,13 +10,25 @@ class ZlibCompressor: NIOCompressor {
 
     init(windowBits: Int) {
         self.windowBits = windowBits
-        self.stream = z_stream()
         self.isActive = false
+        self.window = nil
+        
+        self.stream = z_stream()
+        self.stream.zalloc = nil
+        self.stream.zfree = nil
+        self.stream.opaque = nil
+
     }
 
     deinit {
         if isActive {
             try? finishStream()
+        }
+    }
+
+    var window: ByteBuffer? {
+        didSet {
+            assert(!isActive) // cannot set window while a stream compress is running
         }
     }
 
@@ -112,7 +124,7 @@ class ZlibCompressor: NIOCompressor {
         // follows it with an empty stored block that is three bits plus filler bits to the next byte, followed by four bytes
         // (00 00 ff ff)."
         let bufferSize = Int(CCompressZlib.deflateBound(&stream, UInt(from.readableBytes)))
-        return bufferSize + 5
+        return bufferSize + 6
     }
     
     func resetStream() throws {
@@ -137,6 +149,7 @@ class ZlibDecompressor: NIODecompressor {
     init(windowBits: Int) {
         self.windowBits = windowBits
         self.isActive = false
+        self.window = nil
     }
 
     deinit {
@@ -144,6 +157,8 @@ class ZlibDecompressor: NIODecompressor {
             try? finishStream()
         }
     }
+
+    var window: ByteBuffer?
 
     func startStream() throws {
         assert(!isActive)

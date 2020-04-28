@@ -4,15 +4,23 @@ import NIO
 /// Compressor using LZ4
 class LZ4Compressor: NIOCompressor {
     var stream: UnsafeMutablePointer<LZ4_stream_t>?
-    var dictionary: ByteBuffer! = nil
+    var dictionary: ByteBuffer!
     
     init() {
         stream = nil
+        dictionary = nil
+        window = nil
     }
     
     deinit {
         if stream != nil {
             try? finishStream()
+        }
+    }
+
+    var window: ByteBuffer? {
+        didSet {
+            assert(stream == nil) // cannot set window while a stream compress is running
         }
     }
 
@@ -112,6 +120,11 @@ class LZ4Decompressor: NIODecompressor {
         }
     }
 
+    var window: ByteBuffer? {
+        get { preconditionFailure("Window decompression is unavailable for LZ4") }
+        set { preconditionFailure("Window decompression is unavailable for LZ4") }
+    }
+    
     func startStream() throws {
         assert(stream == nil)
         stream = LZ4_createStreamDecode()

@@ -9,6 +9,9 @@ public protocol NIODecompressor: class {
     ///   - to: destination byte buffer
     func inflate(from: inout ByteBuffer, to: inout ByteBuffer) throws
     
+    /// Working buffer for window based compression
+    var window: ByteBuffer? { get set }
+    
     /// Setup decompressor for stream decompression
     func startStream() throws
     
@@ -57,6 +60,9 @@ public protocol NIOCompressor: class {
     ///   - from: source byte buffer
     ///   - to: destination byte buffer
     func deflate(from: inout ByteBuffer, to: inout ByteBuffer) throws
+    
+    /// Working buffer for window based compression
+    var window: ByteBuffer? { get set }
     
     /// Setup compressor for stream compression
     func startStream() throws

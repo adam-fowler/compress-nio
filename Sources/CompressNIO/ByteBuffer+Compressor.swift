@@ -132,15 +132,15 @@ extension ByteBuffer {
     /// A version of decompressStream which you provide a fixed sized window buffer to and a process closure. When the window buffer is full the process
     /// closure is called. If there is any unprocessed data left at the end of the compress the process closure is called with this.
     ///
+    /// Before calling this you need to provide a working window `ByteBuffer` to the decompressor by setting `NIODecompressor.window`.
     /// This function will not work with the LZ4 compressor
     ///
     /// - Parameters:
     ///   - compressor: Algorithm to use when decompressing
-    ///   - window: Window Byte buffer allocator used to write decompressed data into
     ///   - process: Closure to be called when window buffer fills up or decompress has finished
     /// - Returns: `ByteBuffer` containing compressed data
-    public mutating func decompressStream(with decompressor: NIODecompressor, window: ByteBuffer, process: (ByteBuffer)->()) throws {
-        var window = window
+    public mutating func decompressStream(with decompressor: NIODecompressor, process: (ByteBuffer)->()) throws {
+        guard var window = decompressor.window else { preconditionFailure("decompressString(with:flush:process requires your compressor has a window buffer")}
         while self.readableBytes > 0 {
             do {
                 try decompressStream(to: &window, with: decompressor)
@@ -210,16 +210,15 @@ extension ByteBuffer {
     /// A version of compressStream which you provide a fixed sized window buffer to and a process closure. When the window buffer is full the process
     /// closure is called. If there is any unprocessed data left at the end of the compress the process closure is called with this.
     ///
-    /// This function will not work with the LZ4 compressor
+    /// Before calling this you need to provide a working window `ByteBuffer` to the compressor by setting `NIOCompressor.window`.
     ///
     /// - Parameters:
     ///   - compressor: Algorithm to use when compressing
     ///   - flush: how compressor should flush output data.
-    ///   - window: Window Byte buffer allocator used to write compressed data into
     ///   - process: Closure to be called when window buffer fills up or compress has finished
     /// - Returns: `ByteBuffer` containing compressed data
-    public mutating func compressStream(with compressor: NIOCompressor, flush: CompressNIOFlush, window: ByteBuffer, process: (ByteBuffer)->()) throws {
-        var window = window
+    public mutating func compressStream(with compressor: NIOCompressor, flush: CompressNIOFlush, process: (ByteBuffer)->()) throws {
+        guard var window = compressor.window else { preconditionFailure("compressString(with:flush:process requires your compressor has a window buffer") }
         while self.readableBytes > 0 {
             do {
                 try compressStream(to: &window, with: compressor, flush: .no)

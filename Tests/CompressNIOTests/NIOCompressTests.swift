@@ -196,6 +196,7 @@ class CompressNIOTests: XCTestCase {
         var bufferToCompress = buffer
         
         let compressor = algorithm.compressor
+        compressor.window = window
         try compressor.startStream()
         var compressedBuffer = ByteBufferAllocator().buffer(capacity: 0)
 
@@ -203,7 +204,7 @@ class CompressNIOTests: XCTestCase {
             let size = min(bufferToCompress.readableBytes, streamBufferSize)
             let flush: CompressNIOFlush = bufferToCompress.readableBytes - size == 0 ? .finish : .no
             var slice = bufferToCompress.readSlice(length: size)!
-            try slice.compressStream(with: compressor, flush: flush, window: window) { window in
+            try slice.compressStream(with: compressor, flush: flush) { window in
                 var window = window
                 compressedBuffer.writeBuffer(&window)
             }
@@ -226,12 +227,13 @@ class CompressNIOTests: XCTestCase {
 
         var uncompressedBuffer = ByteBufferAllocator().buffer(capacity: 0)
         let decompressor = algorithm.decompressor
+        decompressor.window = window
         try decompressor.startStream()
 
         while compressedBuffer.readableBytes > 0 {
             let size = min(compressedBuffer.readableBytes, streamBufferSize)
             var slice = compressedBuffer.readSlice(length: size)!
-            try slice.decompressStream(with: decompressor, window: window) { window in
+            try slice.decompressStream(with: decompressor) { window in
                 var window = window
                 uncompressedBuffer.writeBuffer(&window)
             }
