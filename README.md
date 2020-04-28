@@ -24,24 +24,39 @@ If you provide a buffer that is too small a `CompressNIO.bufferOverflow` error i
 # Streaming
 There are situations where you might want to or are required to compress/decompress a block of data in smaller slices. If you have a large file you want to compress it is probably best to load it in smaller slices instead of loading it all into memory in one go. If you are receiving a block of compressed data via HTTP you cannot guarantee it will be delivered in one slice. Swift NIO Compress provides a streaming api to support these situations. 
 
-If you are compressing first you create a `NIOCompressor` and call `startStream` then for each segment of the larger block of data you receive you call `streamCompress`. Once you are done you call `finishStream`. Decompression has a similar pattern. In a similar way to the one shot methods above the stream methods provide both versions that create a new `ByteBuffer` and versions you supply an already allocated buffer. 
+## Compressing 
+
+There are three methods for doing stream compressing: window, allocating and raw. All of them start with calling `compressor.startStream` and end with calling `compressor.finishStream`. 
+
+#### Window method
+For the window method you provide a working buffer for the compressor to use. When you call `compressStream` it compresses into this buffer and when the buffer is full it will call a `process` closure you have provided.
 ```swift
-let compressedBuffer = ByteBufferAllocator().buffer(capacity: sizeOfCompressedData)
 let compressor = CompressionAlgorithm.gzip.compressor
+compressor.window = ByteBufferAllocator().buffer(64*1024)
 try compressor.startStream()
-while buffer = getSlice() {
-    let flush: CompressNIOFlush = isThisTheLastSlice ? .finish : .no
-    try buffer.compressStream(to: &compressedBuffer, with: compressor, flush: flush)
+try compressor.compressStream(with: compressor, flush: .final) { buffer in
+    // process your compressed data
 }
 try compressor.finishStream()
 ```
-This will compress data you are receiving via the `getSlice` function and output all of it into `compressedBuffer`. The last slice you compress you need to call with the `flush` parameter set to `.finish`. If you don't know at that point that you have just received your last slice you can call at the end `compressStream` on an empty `ByteBuffer` like this
+#### Allocation method
+With the allocating method you leave the compressor to allocate the ByteBuffers for output data. It will calculate the maximum possible size the compressed data could be and allocates that amount of space for each compressed data block. The last compressed block needs to have the `flush` parameter set to `.finish`
 ```swift
-var emptyBuffer = ByteBufferAllocator().buffer(capacity: 0)
-try emptyBuffer.compressStream(to: &compressedBuffer, with: compressor, flush: .finish)
+let compressor = CompressionAlgorithm.gzip.compressor
+try compressor.startStream()
+while buffer = getData() {
+    let flush: CompressNIOFlush = isThisTheFinalBlock ? .finish : .sync
+    let compressedBuffer = try buffer.compressStream(with: compressor, flush: flush, allocator: ByteBufferAllocator())
+}
+try compressor.finishStream()
 ```
+If you don't know when you are receiving your last data block you can always compress an empty `ByteBuffer` with the `flush` set to `.finish` to get your final block. Also note that the flush parameter is set to `.sync` in the loop. This is required otherwise the next `compressStream` cannot successfully estimate its buffer size as there might be buffered data still waiting to be output.
+#### Raw method
+With this mehod you call the lowest level function and deal with `.bufferOverflow` errors thrown whenever you run out of space in your output buffer. You will need a loop for receiving data and then you will need an inner loop for compressing that data. You call the `compress` until you have no more data to compress. Everytime you receive a `.bufferOverflow` error you have to provide a new output data. Once you have read all the input data you do the same again but with the `flush` parameter set to `.finish`.
 
-While streaming if the buffer you are compressing into is too small a `CompressNIO.bufferOverflow` error will be thrown. In this situation you can provide another `ByteBuffer` to receive the remains of the data. Data may have already been decompressed into your original buffer so don't throw away the original.
+## Decompressing
+
+The same three methods window, allocation, raw are available for decompressing streamed data but you don't need to set a `flush` parameter to `.finish` while decompressing which makes everything a little easier. 
 
 # LZ4
 
