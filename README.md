@@ -34,8 +34,10 @@ For the window method you provide a working buffer for the compressor to use. Wh
 let compressor = CompressionAlgorithm.gzip.compressor
 compressor.window = ByteBufferAllocator().buffer(capacity: 64*1024)
 try compressor.startStream()
-try compressor.compressStream(with: compressor, flush: .finish) { buffer in
-    // process your compressed data
+while var buffer = getData() {
+    try buffer.compressStream(with: compressor, flush: .finish) { buffer in
+        // process your compressed data
+    }
 }
 try compressor.finishStream()
 ```
