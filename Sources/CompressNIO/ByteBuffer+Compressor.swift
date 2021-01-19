@@ -269,7 +269,7 @@ extension ByteBuffer {
     /// - Parameters:
     ///   - to: Target `ByteBuffer`
     ///   - closure: Process closure
-    mutating func withUnsafeProcess(to: inout ByteBuffer, closure: (UnsafeMutableRawBufferPointer, UnsafeMutableRawBufferPointer) throws -> ()) throws {
+    public mutating func withUnsafeProcess(to: inout ByteBuffer, closure: (UnsafeMutableRawBufferPointer, UnsafeMutableRawBufferPointer) throws -> ()) throws {
         try self.withUnsafeMutableReadableBytes { fromBuffer in
             try to.withUnsafeMutableWritableBytes { toBuffer in
                 try closure(fromBuffer, toBuffer)

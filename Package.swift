@@ -10,13 +10,12 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.9.0"),
     ],
     targets: [
-        .target(name: "CompressNIO", dependencies: ["NIO", "CCompressZlib", "CLZ4"]),
+        .target(name: "CompressNIO", dependencies: ["NIO", "CCompressZlib"]),
         .target(name: "CCompressZlib",
                 dependencies: [],
                 linkerSettings: [
                     .linkedLibrary("z")
                 ]),
-        .target(name: "CLZ4"),
         .testTarget(name: "CompressNIOTests", dependencies: ["CompressNIO"]),
     ]
 )

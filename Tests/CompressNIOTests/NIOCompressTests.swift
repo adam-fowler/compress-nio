@@ -1,4 +1,3 @@
-
 import NIO
 import XCTest
 @testable import CompressNIO
@@ -462,28 +461,6 @@ class CompressNIOTests: XCTestCase {
         try testReset(.gzip)
     }
     
-    func testLZ4Compress() throws {
-        try testCompressDecompress(.lz4)
-    }
-
-    func testLZ4StreamCompress() throws {
-        try testBlockStreamCompressDecompress(.lz4, bufferSize: 256*1024, blockSize: 16*1024)
-    }
-
-    func testLZ4AllocatingDecompress() throws {
-        let bufferSize = 16000
-        // create a buffer that will compress well
-        let buffer = createRandomBuffer(size: bufferSize, randomness: 10)
-        var bufferToCompress = buffer
-        var compressedBuffer = try bufferToCompress.compress(with: .lz4)
-        let uncompressedBuffer = try compressedBuffer.decompress(with: .lz4)
-        XCTAssertEqual(buffer, uncompressedBuffer)
-    }
-
-    func testLZ4Reset() throws {
-        try testReset(.lz4)
-    }
-    
     func testPerformance(_ algorithm: CompressionAlgorithm, buffer: inout ByteBuffer) throws {
         var compressedBuffer = ByteBufferAllocator().buffer(capacity: algorithm.compressor.maxSize(from: buffer))
         var uncompressedBuffer = ByteBufferAllocator().buffer(capacity: buffer.readableBytes)
@@ -496,7 +473,7 @@ class CompressNIOTests: XCTestCase {
     }
 
     func testPerformance() throws {
-        let algorithms: [CompressionAlgorithm] = [.gzip, .deflate, .lz4]
+        let algorithms: [CompressionAlgorithm] = [.gzip, .deflate]
         print("Testing performance 20% random")
         let buffer = createRandomBuffer(size: 1*1024*1024, randomness: 20)
         for algo in algorithms {
@@ -538,10 +515,6 @@ class CompressNIOTests: XCTestCase {
             ("testRandomAllocatingDecompress", testRandomAllocatingDecompress),
             ("testAllocatingStreamCompressDecompress", testAllocatingStreamCompressDecompress),
             ("testGZipReset", testGZipReset),
-            ("testLZ4Compress", testLZ4Compress),
-            ("testLZ4StreamCompress", testLZ4StreamCompress),
-            ("testLZ4AllocatingDecompress", testLZ4AllocatingDecompress),
-            ("testLZ4Reset", testLZ4Reset),
             ("testPerformance", testPerformance),
         ]
     }
