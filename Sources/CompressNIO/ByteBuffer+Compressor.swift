@@ -153,10 +153,7 @@ extension ByteBuffer {
 
         if window.readableBytes > 0 {
             process(window)
-            window.moveReaderIndex(to: 0)
-            window.moveWriterIndex(to: 0)
         }
-        decompressor.window = window
     }
 
     /// Compress one byte buffer from a stream of blocks into another bytebuffer
@@ -263,7 +260,6 @@ extension ByteBuffer {
                 window.moveWriterIndex(to: 0)
             }
         }
-        
         compressor.window = window
     }
 }

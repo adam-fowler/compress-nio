@@ -122,8 +122,6 @@ extension NIOCompressor {
         if window.readableBytes > 0 {
             process(window)
         }
-        window.moveReaderIndex(to: 0)
-        window.moveWriterIndex(to: 0)
     }
 }
 

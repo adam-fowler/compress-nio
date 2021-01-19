@@ -26,11 +26,7 @@ class ZlibCompressor: NIOCompressor {
         }
     }
 
-    var window: ByteBuffer? {
-        didSet {
-            assert(!isActive) // cannot set window while a stream compress is running
-        }
-    }
+    var window: ByteBuffer?
 
     func startStream() throws {
         assert(!isActive)
@@ -135,7 +131,10 @@ class ZlibCompressor: NIOCompressor {
 
     func finishStream() throws {
         assert(isActive)
-        isActive = false
+        self.isActive = false
+        self.window?.moveReaderIndex(to: 0)
+        self.window?.moveWriterIndex(to: 0)
+
         let rt = deflateEnd(&stream)
         switch rt {
         case Z_OK:
