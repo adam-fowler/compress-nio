@@ -63,7 +63,9 @@ class LZ4Compressor: NIOCompressor {
         to.moveWriterIndex(forwardBy: bytesWritten)
         from.moveReaderIndex(forwardBy: bytesRead)
     }
-    
+
+    func finishDeflate(to: inout ByteBuffer) throws {}
+
     func finishStream() throws {
         assert(stream != nil)
         LZ4_freeStream(stream)

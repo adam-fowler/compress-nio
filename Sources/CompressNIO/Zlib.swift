@@ -100,6 +100,39 @@ class ZlibCompressor: NIOCompressor {
         }
     }
 
+    func finishDeflate(to: inout ByteBuffer) throws {
+        assert(isActive)
+        var bytesWritten = 0
+
+        defer {
+            to.moveWriterIndex(forwardBy: bytesWritten)
+        }
+
+        try to.withUnsafeMutableWritableBytes { toBuffer in
+            stream.avail_in = 0
+            stream.next_in = nil
+            stream.avail_out = UInt32(toBuffer.count)
+            stream.next_out = CCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
+
+            let rt = CCompressZlib.deflate(&stream, Z_FINISH)
+            bytesWritten = stream.next_out - CCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
+            switch rt {
+            case Z_OK:
+                throw CompressNIOError.bufferOverflow
+            case Z_DATA_ERROR:
+                throw CompressNIOError.corruptData
+            case Z_BUF_ERROR:
+                throw CompressNIOError.bufferOverflow
+            case Z_MEM_ERROR:
+                throw CompressNIOError.noMoreMemory
+            case Z_STREAM_END:
+                break
+            default:
+                throw CompressNIOError.internalError
+            }
+        }
+    }
+
     func finishStream() throws {
         assert(isActive)
         isActive = false

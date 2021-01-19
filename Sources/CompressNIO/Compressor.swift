@@ -73,10 +73,17 @@ public protocol NIOCompressor: class {
     ///   - to: destination byte buffer
     ///   - flush: how compressor should flush output data.
     func streamDeflate(from: inout ByteBuffer, to: inout ByteBuffer, flush: CompressNIOFlush) throws
-    
+
+    /// Finish stream deflate, where you have no more input data but still have data to output
+    /// - Parameter to: destination byte buffer
+    func finishDeflate(to: inout ByteBuffer) throws
+
     /// Finish using this compressor for stream compression
     func finishStream() throws
-    
+
+    /// Finish using this compressor for stream compression
+    func finishWindowedStream(process: (ByteBuffer)->()) throws
+
     /// equivalent of calling `finishStream` followed by `startStream`. There maybe implementation of this that are more optimal
     func resetStream() throws
 
@@ -97,6 +104,26 @@ extension NIOCompressor {
     public func resetStream() throws {
         try finishStream()
         try startStream()
+    }
+
+    public func finishWindowedStream(process: (ByteBuffer)->()) throws {
+        guard var window = self.window else { preconditionFailure("finishWindowedStream requires your compressor has a window buffer") }
+        while true {
+            do {
+                try finishDeflate(to: &window)
+                break
+            } catch let error as CompressNIOError where error == .bufferOverflow {
+                process(window)
+                window.moveReaderIndex(to: 0)
+                window.moveWriterIndex(to: 0)
+            }
+        }
+
+        if window.readableBytes > 0 {
+            process(window)
+        }
+        window.moveReaderIndex(to: 0)
+        window.moveWriterIndex(to: 0)
     }
 }
 
