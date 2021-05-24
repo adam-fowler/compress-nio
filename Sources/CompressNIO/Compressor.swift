@@ -2,7 +2,7 @@
 import NIO
 
 /// Protocol for decompressor
-public protocol NIODecompressor: class {
+public protocol NIODecompressor: AnyObject {
     /// Decompress byte buffer to another byte buffer
     /// - Parameters:
     ///   - from: source byte buffer
@@ -54,7 +54,7 @@ public enum CompressNIOFlush {
 }
 
 /// Protocol for compressor
-public protocol NIOCompressor: class {
+public protocol NIOCompressor: AnyObject {
     /// Compress byte buffer to another byte buffer
     /// - Parameters:
     ///   - from: source byte buffer
