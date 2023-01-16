@@ -1,45 +1,59 @@
-name: Swift
+name: CI
 
-on: 
+on:
   push:
-    branches: 
-    - "*"
+    branches:
+    - main
   pull_request:
-    branches: 
-    - "*"
+    branches:
+    - main
+  release:
+    types: [published]
+  workflow_dispatch:
 
 jobs:
-  macOS:
+  macos:
     runs-on: macOS-latest
-    env:
-      DEVELOPER_DIR: /Applications/Xcode_11.4.app/Contents/Developer
     steps:
     - name: Checkout
-      uses: actions/checkout@v1
+      uses: actions/checkout@v2
+    - name: SPM tests
+      run: swift test --enable-code-coverage --parallel
+    - name: Convert coverage files
+      run: |
+        xcrun llvm-cov export -format "lcov" \
+          .build/debug/compress-nioPackageTests.xctest/Contents/MacOs/compress-nioPackageTests \
+          -ignore-filename-regex="\/Tests\/" \
+          -instr-profile=.build/debug/codecov/default.profdata > info.lcov
+    - name: Upload to codecov.io
+      uses: codecov/codecov-action@v1
       with:
-        fetch-depth: 1
-    - name: Build
-      run: swift build
-    - name: Test
-      run: swift test
-      
+        file: info.lcov
   linux:
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        image: ["swift:5.0", "swift:5.1", "swift:5.2", "swift:5.3", "swift:5.4"]
-    runs-on: ubuntu-latest
+        image:
+          - 'swift:5.4'
+          - 'swift:5.5'
+          - 'swift:5.6'
+          - 'swift:5.7'
     container:
       image: ${{ matrix.image }}
     steps:
     - name: Checkout
-      uses: actions/checkout@v1
-      with:
-        fetch-depth: 1
-    - name: Install dependencies
-      run: |
-        apt-get update -qq
-        apt-get install -q -y zlib1g-dev
-    - name: Build
-      run: swift build
+      uses: actions/checkout@v3
     - name: Test
-      run: swift test
+      run: |
+        swift --version
+        swift test --enable-code-coverage --parallel
+    - name: Convert coverage files
+      run: |
+        llvm-cov export -format="lcov" \
+          .build/debug/compress-nioPackageTests.xctest \
+          -ignore-filename-regex="\/Tests\/" \
+          -instr-profile .build/debug/codecov/default.profdata > info.lcov
+    - name: Upload to codecov.io
+      uses: codecov/codecov-action@v1
+      with:
+        file: info.lcov
