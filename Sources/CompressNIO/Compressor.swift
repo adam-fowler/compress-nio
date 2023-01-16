@@ -1,5 +1,5 @@
 
-import NIO
+import NIOCore
 
 /// Protocol for decompressor
 public protocol NIODecompressor: AnyObject {

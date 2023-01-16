@@ -1,4 +1,4 @@
-// swift-tools-version:5.0
+// swift-tools-version:5.4
 import PackageDescription
 
 let package = Package(
@@ -7,10 +7,13 @@ let package = Package(
         .library(name: "CompressNIO", targets: ["CompressNIO"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-nio.git", from: "2.9.0"),
+        .package(url: "https://github.com/apple/swift-nio.git", from: "2.40.0"),
     ],
     targets: [
-        .target(name: "CompressNIO", dependencies: ["NIO", "CCompressZlib"]),
+        .target(name: "CompressNIO", dependencies: [
+            .product(name: "NIOCore", package: "swift-nio"), 
+            .byName(name: "CCompressZlib")
+        ]),
         .target(name: "CCompressZlib",
                 dependencies: [],
                 linkerSettings: [

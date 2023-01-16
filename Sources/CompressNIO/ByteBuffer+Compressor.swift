@@ -1,5 +1,5 @@
 
-import NIO
+import NIOCore
 
 // compress/decompress extensions to ByteBuffer
 extension ByteBuffer {
@@ -207,7 +207,8 @@ extension ByteBuffer {
         
     }
     
-    /// A version of compressStream which you provide a fixed sized window buffer to and a process closure. When the window buffer is full the process
+    /// A version of compressStream which you provide a fixed sized window buffer to and a process closure. 
+    /// When the window buffer is full the process
     /// closure is called. If there is any unprocessed data left at the end of the compress the process closure is called with this.
     ///
     /// Before calling this you need to provide a working window `ByteBuffer` to the compressor by setting `NIOCompressor.window`.

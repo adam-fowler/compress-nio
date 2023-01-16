@@ -1,9 +1,9 @@
 
 import CCompressZlib
-import NIO
+import NIOCore
 
 /// Compressor using Zlib
-class ZlibCompressor: NIOCompressor {
+final class ZlibCompressor: NIOCompressor {
     let windowBits: Int
     var stream: z_stream
     var isActive: Bool
