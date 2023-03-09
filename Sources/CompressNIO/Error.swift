@@ -1,5 +1,5 @@
 
-import NIO
+import NIOCore
 
 /// Errors returned from compression/decompression routines
 public struct CompressNIOError: Swift.Error, CustomStringConvertible, Equatable {
