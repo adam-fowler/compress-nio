@@ -28,6 +28,7 @@ extension ByteBuffer {
     ///
     /// - Parameters:
     ///   - buffer: Byte buffer to write decompressed data to
+    ///   - maxSize: Maximum size of buffer to allocate to decompress into
     ///   - allocator: Byte buffer allocator used to create new byte buffers
     /// - Throws:
     ///     - `NIOCompression.Error.bufferOverflow` if output byte buffer doesn't have enough space to write the decompressed data into
@@ -114,6 +115,7 @@ extension ByteBuffer {
     ///
     /// - Parameters:
     ///   - decompressor: Algorithm to use when decompressing
+    ///   - maxSize: Maximum size of buffer to allocate to decompress into
     ///   - allocator: Byte buffer allocator used to allocate the new `ByteBuffer`
     /// - Returns: `ByteBuffer` containing compressed data
     public mutating func decompressStream(
