@@ -14,7 +14,7 @@ extension ByteBuffer {
     ///         to write the decompressed data into
     ///     - `NIOCompression.Error.corruptData` if the input byte buffer is corrupted
     public mutating func decompress(to buffer: inout ByteBuffer, with algorithm: CompressionAlgorithm) throws {
-        let decompressor = algorithm.decompressor
+        let decompressor = algorithm.decompressor(windowBits: 15)
         try decompressor.inflate(from: &self, to: &buffer)
     }
 
@@ -33,7 +33,7 @@ extension ByteBuffer {
     ///     - `NIOCompression.Error.bufferOverflow` if output byte buffer doesn't have enough space to write the decompressed data into
     ///     - `NIOCompression.Error.corruptData` if the input byte buffer is corrupted
     public mutating func decompress(with algorithm: CompressionAlgorithm, allocator: ByteBufferAllocator = ByteBufferAllocator()) throws -> ByteBuffer {
-        let decompressor = algorithm.decompressor
+        let decompressor = algorithm.decompressor(windowBits: 15)
         try decompressor.startStream()
         let buffer = try decompressStream(with: decompressor, allocator: allocator)
         try decompressor.finishStream()
@@ -48,7 +48,7 @@ extension ByteBuffer {
     ///     - `NIOCompression.Error.bufferOverflow` if output byte buffer doesnt have enough space to 
     ///         write the compressed data into
     public mutating func compress(to buffer: inout ByteBuffer, with algorithm: CompressionAlgorithm) throws {
-        let compressor = algorithm.compressor
+        let compressor = algorithm.compressor(windowBits: 15)
         try compressor.deflate(from: &self, to: &buffer)
     }
     
@@ -61,7 +61,7 @@ extension ByteBuffer {
         with algorithm: CompressionAlgorithm, 
         allocator: ByteBufferAllocator = ByteBufferAllocator()
     ) throws -> ByteBuffer {
-        let compressor = algorithm.compressor
+        let compressor = algorithm.compressor(windowBits: 15)
         var buffer = allocator.buffer(capacity: compressor.maxSize(from: self))
         try compressor.deflate(from: &self, to: &buffer)
         return buffer
