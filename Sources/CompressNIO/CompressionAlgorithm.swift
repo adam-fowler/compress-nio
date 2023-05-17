@@ -37,8 +37,11 @@ public struct CompressionAlgorithm: CustomStringConvertible {
         }
     }
     
+    /// Deflate with gzip header
     public static let gzip = CompressionAlgorithm(algorithm: .gzip)
+    /// Deflate with zlib header
     public static let deflate = CompressionAlgorithm(algorithm: .deflate)
+    /// Raw deflate without a header
     public static let rawDeflate = CompressionAlgorithm(algorithm: .rawDeflate)
 }
 
