@@ -32,10 +32,14 @@ extension ByteBuffer {
     /// - Throws:
     ///     - `NIOCompression.Error.bufferOverflow` if output byte buffer doesn't have enough space to write the decompressed data into
     ///     - `NIOCompression.Error.corruptData` if the input byte buffer is corrupted
-    public mutating func decompress(with algorithm: CompressionAlgorithm, allocator: ByteBufferAllocator = ByteBufferAllocator()) throws -> ByteBuffer {
+    public mutating func decompress(
+        with algorithm: CompressionAlgorithm, 
+        maxSize: Int = .max,
+        allocator: ByteBufferAllocator = ByteBufferAllocator()
+    ) throws -> ByteBuffer {
         let decompressor = algorithm.decompressor(windowBits: 15)
         try decompressor.startStream()
-        let buffer = try decompressStream(with: decompressor, allocator: allocator)
+        let buffer = try decompressStream(with: decompressor, maxSize: maxSize, allocator: allocator)
         try decompressor.finishStream()
         return buffer
     }
@@ -114,13 +118,23 @@ extension ByteBuffer {
     /// - Returns: `ByteBuffer` containing compressed data
     public mutating func decompressStream(
         with decompressor: NIODecompressor, 
+        maxSize: Int = .max, 
         allocator: ByteBufferAllocator = ByteBufferAllocator()
     ) throws -> ByteBuffer {
         var buffers: [ByteBuffer] = []
         let originalSize = self.readableBytes
-        func _decompress(iteration: Int) throws {
+        func _decompress(iteration: Int, bufferSize: Int) throws {
+            var bufferSize = bufferSize
+            if bufferSize >= maxSize {
+                throw CompressNIOError.bufferOverflow
+            }
+            var nextBufferSize = iteration * 3 * originalSize / 2 
+            if bufferSize + nextBufferSize > maxSize {
+                nextBufferSize = maxSize - bufferSize
+            }
+            bufferSize += nextBufferSize
             // grow buffer to write into with each iteration
-            var buffer = allocator.buffer(capacity: iteration * 3 * originalSize / 2)
+            var buffer = allocator.buffer(capacity: nextBufferSize)
             do {
                 defer {
                     if buffer.readableBytes > 0 {
@@ -129,11 +143,11 @@ extension ByteBuffer {
                 }
                 try decompressStream(to: &buffer, with: decompressor)
             } catch let error as CompressNIOError where error == CompressNIOError.bufferOverflow {
-                try _decompress(iteration: iteration+1)
+                try _decompress(iteration: iteration+1, bufferSize: bufferSize)
             }
         }
         
-        try _decompress(iteration: 1)
+        try _decompress(iteration: 1, bufferSize: 0)
         
         if buffers.count == 0 {
             return allocator.buffer(capacity: 0)

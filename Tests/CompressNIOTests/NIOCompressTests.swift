@@ -473,6 +473,19 @@ class CompressNIOTests: XCTestCase {
         try testReset(.gzip)
     }
     
+    func testDecompressMaxSize() throws {
+        var uncompressedBuffer = createRandomBuffer(size: 1025)
+        let compressedBuffer = try uncompressedBuffer.compress(with: .deflate)
+        
+        var copy = compressedBuffer
+        XCTAssertNoThrow(_ = try copy.decompress(with: .deflate, maxSize: 1100))
+        
+        var copy2 = compressedBuffer
+        XCTAssertThrowsError(_ = try copy2.decompress(with: .deflate, maxSize: 1000)) { error in
+            XCTAssertEqual(error as? CompressNIOError, .bufferOverflow)
+        }
+    }
+    
     func testPerformance(_ algorithm: CompressionAlgorithm, buffer: inout ByteBuffer) throws {
         var compressedBuffer = ByteBufferAllocator().buffer(capacity: algorithm.compressor().maxSize(from: buffer))
         var uncompressedBuffer = ByteBufferAllocator().buffer(capacity: buffer.readableBytes)
