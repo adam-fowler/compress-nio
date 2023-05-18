@@ -13,7 +13,7 @@ public struct CompressionAlgorithm: CustomStringConvertible {
     
     /// get compressor
     /// 
-    /// - Parameter windowSize: Window size to use in compressor. Window size if 2^windowSize
+    /// - Parameter windowSize: Window size to use in compressor. Window size is 2^windowSize
     public func compressor(windowSize: Int = 15) -> NIOCompressor {
         assert((9...15).contains(windowSize), "Window bits must be between the values 9 and 15")
         switch algorithm {
@@ -28,7 +28,7 @@ public struct CompressionAlgorithm: CustomStringConvertible {
     
     /// get decompressor
     /// 
-    /// - Parameter windowSize: Window size to use in decompressor. Window size if 2^windowSize
+    /// - Parameter windowSize: Window size to use in decompressor. Window size is 2^windowSize
     public func decompressor(windowSize: Int = 15) -> NIODecompressor {
         assert((9...15).contains(windowSize), "Window bits must be between the values 9 and 15")
         switch algorithm {
