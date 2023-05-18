@@ -15,7 +15,7 @@ public struct CompressionAlgorithm: CustomStringConvertible {
     /// 
     /// - Parameter windowSize: Window size to use in compressor. Window size is 2^windowSize
     public func compressor(windowSize: Int = 15) -> NIOCompressor {
-        assert((9...15).contains(windowSize), "Window bits must be between the values 9 and 15")
+        assert((9...15).contains(windowSize), "Window size must be between the values 9 and 15")
         switch algorithm {
         case .gzip:
             return ZlibCompressor(windowBits: 16 + windowSize)
@@ -30,7 +30,7 @@ public struct CompressionAlgorithm: CustomStringConvertible {
     /// 
     /// - Parameter windowSize: Window size to use in decompressor. Window size is 2^windowSize
     public func decompressor(windowSize: Int = 15) -> NIODecompressor {
-        assert((9...15).contains(windowSize), "Window bits must be between the values 9 and 15")
+        assert((9...15).contains(windowSize), "Window size must be between the values 9 and 15")
         switch algorithm {
         case .gzip:
             return ZlibDecompressor(windowBits: 16 + windowSize)
