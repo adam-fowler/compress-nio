@@ -243,6 +243,23 @@ class CompressNIOTests: XCTestCase {
         XCTAssertEqual(buffer, uncompressedBuffer)
     }
 
+    func testWindowSize(_ algorithm: CompressionAlgorithm, windowSize: Int) throws {
+        let buffer = createRandomBuffer(size: 10240, randomness: 20)
+        var buffer1 = buffer
+        let compressor = algorithm.compressor(windowSize: windowSize)
+        try compressor.startStream()
+        var compressedBuffer = try buffer1.compressStream(with: compressor, flush: .finish)
+        try compressor.finishStream()
+
+        let decompressor = algorithm.decompressor(windowSize: windowSize)
+        try decompressor.startStream()
+        let buffer2 = try compressedBuffer.decompressStream(with: decompressor)
+        try decompressor.finishStream()
+
+        XCTAssertEqual(buffer, buffer2)
+    }
+    
+
     func testGZipCompressDecompress() throws {
         try testCompressDecompress(.gzip)
     }
@@ -285,6 +302,11 @@ class CompressNIOTests: XCTestCase {
     
     func testDecompressWithWindow() throws {
         try streamDecompressWindow(.gzip, inputBufferSize: 256000, streamBufferSize: 75000, windowSize: 32000)
+    }
+    
+    func testWindowSize() throws {
+        try testWindowSize(.gzip, windowSize: 9)
+        try testWindowSize(.rawDeflate, windowSize: 12)
     }
     
     func testTwoStreamsInParallel() throws {

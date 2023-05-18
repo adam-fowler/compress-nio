@@ -12,28 +12,32 @@ public struct CompressionAlgorithm: CustomStringConvertible {
     public var description: String { return algorithm.rawValue }
     
     /// get compressor
-    public func compressor(windowBits: Int = 15) -> NIOCompressor {
-        assert((8...15).contains(windowBits), "Window bits must be between the values 8 and 15")
+    /// 
+    /// - Parameter windowSize: Window size to use in compressor. Window size if 2^windowSize
+    public func compressor(windowSize: Int = 15) -> NIOCompressor {
+        assert((9...15).contains(windowSize), "Window bits must be between the values 9 and 15")
         switch algorithm {
         case .gzip:
-            return ZlibCompressor(windowBits: 16 + windowBits)
+            return ZlibCompressor(windowBits: 16 + windowSize)
         case .deflate:
-            return ZlibCompressor(windowBits: windowBits)
+            return ZlibCompressor(windowBits: windowSize)
         case .rawDeflate:
-            return ZlibCompressor(windowBits: -windowBits)
+            return ZlibCompressor(windowBits: -windowSize)
         }
     }
     
     /// get decompressor
-    public func decompressor(windowBits: Int = 15) -> NIODecompressor {
-        assert((8...15).contains(windowBits), "Window bits must be between the values 8 and 15")
+    /// 
+    /// - Parameter windowSize: Window size to use in decompressor. Window size if 2^windowSize
+    public func decompressor(windowSize: Int = 15) -> NIODecompressor {
+        assert((9...15).contains(windowSize), "Window bits must be between the values 9 and 15")
         switch algorithm {
         case .gzip:
-            return ZlibDecompressor(windowBits: 16 + windowBits)
+            return ZlibDecompressor(windowBits: 16 + windowSize)
         case .deflate:
-            return ZlibDecompressor(windowBits: windowBits)
+            return ZlibDecompressor(windowBits: windowSize)
         case .rawDeflate:
-            return ZlibDecompressor(windowBits: -windowBits)
+            return ZlibDecompressor(windowBits: -windowSize)
         }
     }
     
