@@ -4,12 +4,12 @@ import NIOCore
 
 /// Compressor using Zlib
 final class ZlibCompressor: NIOCompressor {
-    let windowBits: Int
+    let windowSize: Int
     var stream: z_stream
     var isActive: Bool
 
-    init(windowBits: Int) {
-        self.windowBits = windowBits
+    init(windowSize: Int) {
+        self.windowSize = windowSize
         self.isActive = false
         self.window = nil
         
@@ -36,7 +36,7 @@ final class ZlibCompressor: NIOCompressor {
         stream.zfree = nil
         stream.opaque = nil
 
-        let rt = CCompressZlib_deflateInit2(&stream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, Int32(windowBits), 8, Z_DEFAULT_STRATEGY)
+        let rt = CCompressZlib_deflateInit2(&stream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, Int32(windowSize), 8, Z_DEFAULT_STRATEGY)
         switch rt {
         case Z_MEM_ERROR:
             throw CompressNIOError.noMoreMemory
@@ -173,13 +173,13 @@ final class ZlibCompressor: NIOCompressor {
 }
 
 /// Decompressor using Zlib
-class ZlibDecompressor: NIODecompressor {
-    let windowBits: Int
+final class ZlibDecompressor: NIODecompressor {
+    let windowSize: Int
     var isActive: Bool
     var stream = z_stream()
 
-    init(windowBits: Int) {
-        self.windowBits = windowBits
+    init(windowSize: Int) {
+        self.windowSize = windowSize
         self.isActive = false
         self.window = nil
     }
@@ -202,7 +202,7 @@ class ZlibDecompressor: NIODecompressor {
         stream.avail_in = 0;
         stream.next_in = nil;
 
-        let rt = CCompressZlib_inflateInit2(&stream, Int32(windowBits))
+        let rt = CCompressZlib_inflateInit2(&stream, Int32(windowSize))
         switch rt {
         case Z_MEM_ERROR:
             throw CompressNIOError.noMoreMemory

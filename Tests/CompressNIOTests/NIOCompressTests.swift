@@ -58,7 +58,7 @@ class CompressNIOTests: XCTestCase {
 
     func streamCompress(_ algorithm: CompressionAlgorithm, buffer: inout ByteBuffer, blockSize: Int = 1024) throws -> ByteBuffer {
         // compress
-        let compressor = algorithm.compressor()
+        let compressor = algorithm.compressor
         try compressor.startStream()
         var compressedBuffer = ByteBufferAllocator().buffer(capacity: buffer.readableBytes)
 
@@ -79,7 +79,7 @@ class CompressNIOTests: XCTestCase {
     }
 
     func streamBlockCompress(_ algorithm: CompressionAlgorithm, buffer: inout ByteBuffer, blockSize: Int = 1024) throws -> [ByteBuffer] {
-        let compressor = algorithm.compressor()
+        let compressor = algorithm.compressor
         try compressor.startStream()
         var compressedBuffers: [ByteBuffer] = []
         let minBlockSize = blockSize / 2
@@ -105,7 +105,7 @@ class CompressNIOTests: XCTestCase {
 
     func streamDecompress(_ algorithm: CompressionAlgorithm, from: inout ByteBuffer, to: inout ByteBuffer, blockSize: Int = 1024) throws {
         // decompress
-        let decompressor = algorithm.decompressor()
+        let decompressor = algorithm.decompressor
         try decompressor.startStream()
         while from.readableBytes > 0 {
             let size = min(blockSize, from.readableBytes)
@@ -120,7 +120,7 @@ class CompressNIOTests: XCTestCase {
     }
 
     func streamBlockDecompress(_ algorithm: CompressionAlgorithm, from: [ByteBuffer], to: inout ByteBuffer) throws {
-        let decompressor = algorithm.decompressor()
+        let decompressor = algorithm.decompressor
         try decompressor.startStream()
         for var buffer in from {
             var writeOutBuffer = ByteBufferAllocator().buffer(capacity: to.writableBytes)
@@ -167,8 +167,8 @@ class CompressNIOTests: XCTestCase {
         let buffer = createRandomBuffer(size: bufferSize, randomness: 50)
         var bufferToCompress = buffer
 
-        let compressor = algorithm.compressor()
-        let decompressor = algorithm.decompressor()
+        let compressor = algorithm.compressor
+        let decompressor = algorithm.decompressor
         try compressor.startStream()
         var compressedBuffer = try bufferToCompress.compressStream(with: compressor, flush: .finish)
         try compressor.resetStream()
@@ -194,7 +194,7 @@ class CompressNIOTests: XCTestCase {
         let window = ByteBufferAllocator().buffer(capacity: windowSize)
         var bufferToCompress = buffer
         
-        let compressor = algorithm.compressor()
+        let compressor = algorithm.compressor
         compressor.window = window
         try compressor.startStream()
         var compressedBuffer = ByteBufferAllocator().buffer(capacity: 0)
@@ -225,7 +225,7 @@ class CompressNIOTests: XCTestCase {
         var compressedBuffer = try bufferToCompress.compress(with: algorithm)
 
         var uncompressedBuffer = ByteBufferAllocator().buffer(capacity: 0)
-        let decompressor = algorithm.decompressor()
+        let decompressor = algorithm.decompressor
         decompressor.window = window
         try decompressor.startStream()
 
@@ -243,15 +243,15 @@ class CompressNIOTests: XCTestCase {
         XCTAssertEqual(buffer, uncompressedBuffer)
     }
 
-    func testWindowSize(_ algorithm: CompressionAlgorithm, windowSize: Int) throws {
+    func testWindowSize(_ algorithm: CompressionAlgorithm) throws {
         let buffer = createRandomBuffer(size: 10240, randomness: 20)
         var buffer1 = buffer
-        let compressor = algorithm.compressor(windowSize: windowSize)
+        let compressor = algorithm.compressor
         try compressor.startStream()
         var compressedBuffer = try buffer1.compressStream(with: compressor, flush: .finish)
         try compressor.finishStream()
 
-        let decompressor = algorithm.decompressor(windowSize: windowSize)
+        let decompressor = algorithm.decompressor
         try decompressor.startStream()
         let buffer2 = try compressedBuffer.decompressStream(with: decompressor)
         try decompressor.finishStream()
@@ -261,62 +261,62 @@ class CompressNIOTests: XCTestCase {
     
 
     func testGZipCompressDecompress() throws {
-        try testCompressDecompress(.gzip)
+        try testCompressDecompress(.gzip())
     }
 
-    func testDeflateCompressDecompress() throws {
-        try testCompressDecompress(.deflate)
+    func testZlibCompressDecompress() throws {
+        try testCompressDecompress(.zlib())
     }
 
     func testRawDeflateCompressDecompress() throws {
-        try testCompressDecompress(.rawDeflate)
+        try testCompressDecompress(.deflate())
     }
 
     func testGZipStreamCompressDecompress() throws {
-        try testStreamCompressDecompress(.gzip)
+        try testStreamCompressDecompress(.gzip())
     }
 
-    func testDeflateStreamCompressDecompress() throws {
-        try testBlockStreamCompressDecompress(.deflate)
+    func testZlibStreamCompressDecompress() throws {
+        try testBlockStreamCompressDecompress(.zlib())
     }
 
     func testRawDeflateStreamCompressDecompress() throws {
-        try testBlockStreamCompressDecompress(.rawDeflate)
+        try testBlockStreamCompressDecompress(.deflate())
     }
 
     func testGZipBlockStreamCompressDecompress() throws {
-        try testBlockStreamCompressDecompress(.gzip)
+        try testBlockStreamCompressDecompress(.gzip())
     }
 
-    func testDeflateBlockStreamCompressDecompress() throws {
-        try testStreamCompressDecompress(.deflate)
+    func testZlibBlockStreamCompressDecompress() throws {
+        try testStreamCompressDecompress(.zlib())
     }
 
     func testRawDeflateBlockStreamCompressDecompress() throws {
-        try testStreamCompressDecompress(.rawDeflate)
+        try testStreamCompressDecompress(.deflate())
     }
 
     func testCompressWithWindow() throws {
-        try streamCompressWindow(.deflate, inputBufferSize: 240000, streamBufferSize: 110000, windowSize: 75000)
+        try streamCompressWindow(.deflate(), inputBufferSize: 240000, streamBufferSize: 110000, windowSize: 75000)
     }
     
     func testDecompressWithWindow() throws {
-        try streamDecompressWindow(.gzip, inputBufferSize: 256000, streamBufferSize: 75000, windowSize: 32000)
+        try streamDecompressWindow(.gzip(), inputBufferSize: 256000, streamBufferSize: 75000, windowSize: 32000)
     }
     
     func testWindowSize() throws {
-        try testWindowSize(.gzip, windowSize: 9)
-        try testWindowSize(.rawDeflate, windowSize: 12)
+        try testWindowSize(.gzip(windowSize: 9))
+        try testWindowSize(.deflate(windowSize: 12))
     }
     
     func testTwoStreamsInParallel() throws {
         let buffer = createRandomBuffer(size: 1024)
         var bufferToCompress = buffer
-        let compressor = CompressionAlgorithm.gzip.compressor()
+        let compressor = CompressionAlgorithm.gzip().compressor
         var outputBuffer = ByteBufferAllocator().buffer(capacity: compressor.maxSize(from: bufferToCompress))
         let buffer2 = createRandomBuffer(size: 1024)
         var bufferToCompress2 = buffer2
-        let compressor2 = CompressionAlgorithm.gzip.compressor()
+        let compressor2 = CompressionAlgorithm.gzip().compressor
         var outputBuffer2 = ByteBufferAllocator().buffer(capacity: compressor2.maxSize(from: bufferToCompress2))
         try compressor.startStream()
         try compressor2.startStream()
@@ -325,19 +325,19 @@ class CompressNIOTests: XCTestCase {
         try compressor.finishStream()
         try compressor2.finishStream()
         var uncompressedBuffer = ByteBufferAllocator().buffer(capacity: 1024)
-        try outputBuffer.decompress(to: &uncompressedBuffer, with: .gzip)
+        try outputBuffer.decompress(to: &uncompressedBuffer, with: .gzip())
         XCTAssertEqual(buffer, uncompressedBuffer)
         var uncompressedBuffer2 = ByteBufferAllocator().buffer(capacity: 1024)
-        try outputBuffer2.decompress(to: &uncompressedBuffer2, with: .gzip)
+        try outputBuffer2.decompress(to: &uncompressedBuffer2, with: .gzip())
         XCTAssertEqual(buffer2, uncompressedBuffer2)
     }
 
     func testDecompressWithWrongAlgorithm() {
         var buffer = createRandomBuffer(size: 1024)
         do {
-            var compressedBuffer = try buffer.compress(with: .gzip)
+            var compressedBuffer = try buffer.compress(with: .gzip())
             var outputBuffer = ByteBufferAllocator().buffer(capacity: 1024)
-            try compressedBuffer.decompress(to: &outputBuffer, with: .deflate)
+            try compressedBuffer.decompress(to: &outputBuffer, with: .deflate())
             XCTFail("Shouldn't get here")
         } catch let error as CompressNIOError where error == CompressNIOError.corruptData {
         } catch {
@@ -349,7 +349,7 @@ class CompressNIOTests: XCTestCase {
         var buffer = createRandomBuffer(size: 1024)
         var outputBuffer = ByteBufferAllocator().buffer(capacity: 16)
         do {
-            try buffer.compress(to: &outputBuffer, with: .gzip)
+            try buffer.compress(to: &outputBuffer, with: .gzip())
             XCTFail("Shouldn't get here")
         } catch let error as CompressNIOError where error == CompressNIOError.bufferOverflow {
         } catch {
@@ -361,7 +361,7 @@ class CompressNIOTests: XCTestCase {
         var buffer = createRandomBuffer(size: 1024)
         var outputBuffer = ByteBufferAllocator().buffer(capacity: 16)
         do {
-            let compressor = CompressionAlgorithm.gzip.compressor()
+            let compressor = CompressionAlgorithm.gzip().compressor
             try compressor.startStream()
             try buffer.compressStream(to: &outputBuffer, with: compressor, flush: .finish)
             XCTFail("Shouldn't get here")
@@ -374,7 +374,7 @@ class CompressNIOTests: XCTestCase {
     func testRetryCompressAfterOverflowError() throws {
         let buffer = createConsistentRandomBuffer(444, 10659, size: 5041, randomness: 34)
         var bufferToCompress = buffer
-        let compressor = CompressionAlgorithm.deflate.compressor()
+        let compressor = CompressionAlgorithm.deflate().compressor
         try compressor.startStream()
         var compressedBuffer = ByteBufferAllocator().buffer(capacity: 2048)
         do {
@@ -386,7 +386,7 @@ class CompressNIOTests: XCTestCase {
             try compressor.finishStream()
             compressedBuffer.writeBuffer(&compressedBuffer2)
             var outputBuffer = ByteBufferAllocator().buffer(capacity: 5041)
-            try compressedBuffer.decompress(to: &outputBuffer, with: .deflate)
+            try compressedBuffer.decompress(to: &outputBuffer, with: .deflate())
             XCTAssertEqual(outputBuffer, buffer)
         }
     }
@@ -395,7 +395,7 @@ class CompressNIOTests: XCTestCase {
         // create buffer that compresses to exactly 4096 bytes
         let buffer = createConsistentRandomBuffer(444, 10659, size: 5041, randomness: 34)
         var bufferToCompress = buffer
-        let compressor = CompressionAlgorithm.deflate.compressor()
+        let compressor = CompressionAlgorithm.deflate().compressor
         try compressor.startStream()
         var compressedBuffer = ByteBufferAllocator().buffer(capacity: 4096)
         try bufferToCompress.compressStream(to: &compressedBuffer, with: compressor, flush: .finish)
@@ -404,9 +404,9 @@ class CompressNIOTests: XCTestCase {
     func testDecompressWithOverflowError() {
         var buffer = createRandomBuffer(size: 1024)
         do {
-            var compressedBuffer = try buffer.compress(with: .gzip)
+            var compressedBuffer = try buffer.compress(with: .gzip())
             var outputBuffer = ByteBufferAllocator().buffer(capacity: 512)
-            try compressedBuffer.decompress(to: &outputBuffer, with: .gzip)
+            try compressedBuffer.decompress(to: &outputBuffer, with: .gzip())
             XCTFail("Shouldn't get here")
         } catch let error as CompressNIOError where error == CompressNIOError.bufferOverflow {
         } catch {
@@ -417,8 +417,8 @@ class CompressNIOTests: XCTestCase {
     func testRetryDecompressAfterOverflowError() throws {
         let buffer = createRandomBuffer(size: 1024)
         var bufferToCompress = buffer
-        var compressedBuffer = try bufferToCompress.compress(with: .gzip)
-        let decompressor = CompressionAlgorithm.gzip.decompressor()
+        var compressedBuffer = try bufferToCompress.compress(with: .gzip())
+        let decompressor = CompressionAlgorithm.gzip().decompressor
         try decompressor.startStream()
         var outputBuffer = ByteBufferAllocator().buffer(capacity: 512)
         do {
@@ -438,8 +438,8 @@ class CompressNIOTests: XCTestCase {
         // create a buffer that will compress well
         let buffer = createRandomBuffer(size: bufferSize, randomness: 10)
         var bufferToCompress = buffer
-        var compressedBuffer = try bufferToCompress.compress(with: .gzip)
-        let uncompressedBuffer = try compressedBuffer.decompress(with: .gzip)
+        var compressedBuffer = try bufferToCompress.compress(with: .gzip())
+        let uncompressedBuffer = try compressedBuffer.decompress(with: .gzip())
         XCTAssertEqual(buffer, uncompressedBuffer)
     }
 
@@ -448,20 +448,20 @@ class CompressNIOTests: XCTestCase {
         // create a buffer that will compress well
         let buffer = createRandomBuffer(size: bufferSize, randomness: 100)
         var bufferToCompress = buffer
-        var compressedBuffer = try bufferToCompress.compress(with: .gzip)
-        let uncompressedBuffer = try compressedBuffer.decompress(with: .gzip)
+        var compressedBuffer = try bufferToCompress.compress(with: .gzip())
+        let uncompressedBuffer = try compressedBuffer.decompress(with: .gzip())
         XCTAssertEqual(buffer, uncompressedBuffer)
     }
 
     func testAllocatingStreamCompressDecompress() throws {
-        let algorithm: CompressionAlgorithm = .gzip
+        let algorithm: CompressionAlgorithm = .gzip()
         let bufferSize = 16000
         let blockSize = 1024
         let buffer = createRandomBuffer(size: bufferSize, randomness: 25)
 
         // compress
         var bufferToCompress = buffer
-        let compressor = algorithm.compressor()
+        let compressor = algorithm.compressor
         try compressor.startStream()
         var compressedBuffer = ByteBufferAllocator().buffer(capacity: compressor.maxSize(from: bufferToCompress))
 
@@ -477,7 +477,7 @@ class CompressNIOTests: XCTestCase {
 
         // decompress
         var uncompressedBuffer = ByteBufferAllocator().buffer(capacity: bufferSize)
-        let decompressor = algorithm.decompressor()
+        let decompressor = algorithm.decompressor
         try decompressor.startStream()
         while compressedBuffer.readableBytes > 0 {
             let size = min(1024, compressedBuffer.readableBytes)
@@ -492,24 +492,24 @@ class CompressNIOTests: XCTestCase {
     }
 
     func testGZipReset() throws {
-        try testReset(.gzip)
+        try testReset(.gzip())
     }
     
     func testDecompressMaxSize() throws {
         var uncompressedBuffer = createRandomBuffer(size: 1025)
-        let compressedBuffer = try uncompressedBuffer.compress(with: .deflate)
+        let compressedBuffer = try uncompressedBuffer.compress(with: .deflate())
         
         var copy = compressedBuffer
-        XCTAssertNoThrow(_ = try copy.decompress(with: .deflate, maxSize: 1100))
+        XCTAssertNoThrow(_ = try copy.decompress(with: .deflate(), maxSize: 1100))
         
         var copy2 = compressedBuffer
-        XCTAssertThrowsError(_ = try copy2.decompress(with: .deflate, maxSize: 1000)) { error in
+        XCTAssertThrowsError(_ = try copy2.decompress(with: .deflate(), maxSize: 1000)) { error in
             XCTAssertEqual(error as? CompressNIOError, .bufferOverflow)
         }
     }
     
     func testPerformance(_ algorithm: CompressionAlgorithm, buffer: inout ByteBuffer) throws {
-        var compressedBuffer = ByteBufferAllocator().buffer(capacity: algorithm.compressor().maxSize(from: buffer))
+        var compressedBuffer = ByteBufferAllocator().buffer(capacity: algorithm.compressor.maxSize(from: buffer))
         var uncompressedBuffer = ByteBufferAllocator().buffer(capacity: buffer.readableBytes)
 
         let now = Date()
@@ -520,7 +520,7 @@ class CompressNIOTests: XCTestCase {
     }
 
     func testPerformance() throws {
-        let algorithms: [CompressionAlgorithm] = [.gzip, .deflate]
+        let algorithms: [CompressionAlgorithm] = [.gzip(), .deflate()]
         print("Testing performance 20% random")
         let buffer = createRandomBuffer(size: 1*1024*1024, randomness: 20)
         for algo in algorithms {
@@ -539,30 +539,5 @@ class CompressNIOTests: XCTestCase {
             var bufferCopy = buffer3
             try testPerformance(algo, buffer: &bufferCopy)
         }
-    }
-
-    static var allTests : [(String, (CompressNIOTests) -> () throws -> Void)] {
-        return [
-            ("testGZipCompressDecompress", testGZipCompressDecompress),
-            ("testDeflateCompressDecompress", testDeflateCompressDecompress),
-            ("testGZipStreamCompressDecompress", testGZipStreamCompressDecompress),
-            ("testDeflateStreamCompressDecompress", testDeflateStreamCompressDecompress),
-            ("testGZipBlockStreamCompressDecompress", testGZipStreamCompressDecompress),
-            ("testDeflateBlockStreamCompressDecompress", testDeflateStreamCompressDecompress),
-            ("testCompressWithWindow", testCompressWithWindow),
-            ("testDecompressWithWindow", testDecompressWithWindow),
-            ("testTwoStreamsInParallel", testTwoStreamsInParallel),
-            ("testDecompressWithWrongAlgorithm", testDecompressWithWrongAlgorithm),
-            ("testCompressWithOverflowError", testCompressWithOverflowError),
-            ("testStreamCompressWithOverflowError", testStreamCompressWithOverflowError),
-            ("testRetryCompressAfterOverflowError", testRetryCompressAfterOverflowError),
-            ("testDecompressWithOverflowError", testDecompressWithOverflowError),
-            ("testRetryDecompressAfterOverflowError", testRetryDecompressAfterOverflowError),
-            ("testAllocatingDecompress", testAllocatingDecompress),
-            ("testRandomAllocatingDecompress", testRandomAllocatingDecompress),
-            ("testAllocatingStreamCompressDecompress", testAllocatingStreamCompressDecompress),
-            ("testGZipReset", testGZipReset),
-            ("testPerformance", testPerformance),
-        ]
     }
 }
