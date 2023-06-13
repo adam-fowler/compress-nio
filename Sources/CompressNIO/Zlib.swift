@@ -2,6 +2,7 @@
 import CCompressZlib
 import NIOCore
 
+/// Zlib library configuration
 public struct ZlibConfiguration {
     /// Compression Strategy
     public enum Strategy {
@@ -14,12 +15,12 @@ public struct ZlibConfiguration {
         /// image data
         case rle
         ///  For data produced by a filter. Filtered data consists mostly of small
-        /// values with a somewhat random distribution
-        case filtered
-        /// Prevents the use of dynamic Huffman codes, allowing for a simpler
-        /// decoder for special applications. Force more Huffman coding and
+        /// values with a somewhat random distribution. Force more Huffman coding and
         /// less string matching; it is somewhat intermediate between huffmanOnly
         /// and default
+        case filtered
+        /// Prevents the use of dynamic Huffman codes, allowing for a simpler
+        /// decoder for special applications.
         case fixed
 
         var zlibValue: Int32 {
@@ -33,17 +34,24 @@ public struct ZlibConfiguration {
         }
     }
 
-    var windowSize: Int32
-    var compressionLevel: Int32
-    var memoryLevel: Int32
-    var strategy: Strategy
+    /// Base two logarithm of the window size. eg 9 is 512, 10 is 1024
+    public var windowSize: Int32
+    /// Level of compression. Value between 0 and 9 where 1 is fastest, 9 is best compression and
+    /// 0 is no compression
+    public var compressionLevel: Int32
+    /// Amount of memory to use when compressing. Less memory will mean the compression will take longer
+    /// and compression level will be reduced. Value between 1 - 9 where 1 is least amount of memory.
+    public var memoryLevel: Int32
+    /// Strategy when compressing
+    public var strategy: Strategy
 
     ///  Initialise ZlibConfiguration
     /// - Parameters:
     ///   - windowSize: Base two logarithm of the window size. eg 9 is 512, 10 is 1024
-    ///   - compressionLevel: Level of compression
+    ///   - compressionLevel: Level of compression. Value between 0 and 9 where 1 is fastest, 9 is best compression and
+    ///         0 is no compression
     ///   - memoryLevel: Amount of memory to use when compressing. Less memory will mean the compression will take longer
-    ///         and compression level will be reduced
+    ///         and compression level will be reduced. Value between 1 - 9 where 1 is least amount of memory.
     ///   - strategy: Strategy when compressing
     public init(windowSize: Int32 = 15, compressionLevel: Int32 = Z_DEFAULT_COMPRESSION, memoryLevel: Int32 = 8, strategy: Strategy = .default) {
         assert((9...15).contains(windowSize), "Window size must be between the values 9 and 15")
