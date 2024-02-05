@@ -86,7 +86,7 @@ extension ByteBuffer {
     /// - Returns: `ByteBuffer` containing compressed data
     public mutating func decompressStream(
         with decompressor: NIODecompressor, 
-        process: (ByteBuffer)->()
+        process: (ByteBuffer) throws -> ()
     ) throws {
         guard var window = decompressor.window else { 
             preconditionFailure("decompressString(with:flush:process requires your compressor has a window buffer")
@@ -95,14 +95,48 @@ extension ByteBuffer {
             do {
                 try decompressStream(to: &window, with: decompressor)
             } catch let error as CompressNIOError where error == .bufferOverflow {
-                process(window)
+                try process(window)
                 window.moveReaderIndex(to: 0)
                 window.moveWriterIndex(to: 0)
             }
         }
 
         if window.readableBytes > 0 {
-            process(window)
+            try process(window)
+        }
+    }
+    
+    /// A version of decompressStream which you provide a fixed sized window buffer to and a process closure. 
+    /// 
+    /// When the window buffer is full the process closure is called. If there is any unprocessed data left 
+    /// at the end of the compress the process closure is called with this.
+    ///
+    /// Before calling this you need to provide a working window `ByteBuffer` to the decompressor by 
+    /// setting `NIODecompressor.window`.
+    ///
+    /// - Parameters:
+    ///   - compressor: Algorithm to use when decompressing
+    ///   - process: Closure to be called when window buffer fills up or decompress has finished
+    /// - Returns: `ByteBuffer` containing compressed data
+    public mutating func decompressStream(
+        with decompressor: NIODecompressor, 
+        process: (ByteBuffer) async throws -> ()
+    ) async throws {
+        guard var window = decompressor.window else { 
+            preconditionFailure("decompressString(with:flush:process requires your compressor has a window buffer")
+        }
+        while self.readableBytes > 0 {
+            do {
+                try decompressStream(to: &window, with: decompressor)
+            } catch let error as CompressNIOError where error == .bufferOverflow {
+                try await process(window)
+                window.moveReaderIndex(to: 0)
+                window.moveWriterIndex(to: 0)
+            }
+        }
+
+        if window.readableBytes > 0 {
+            try await process(window)
         }
     }
     
@@ -215,14 +249,14 @@ extension ByteBuffer {
     public mutating func compressStream(
         with compressor: NIOCompressor, 
         flush: CompressNIOFlush, 
-        process: (ByteBuffer)->()
+        process: (ByteBuffer) throws -> ()
     ) throws {
         guard var window = compressor.window else { preconditionFailure("compressString(with:flush:process requires your compressor has a window buffer") }
         while self.readableBytes > 0 {
             do {
                 try compressStream(to: &window, with: compressor, flush: .no)
             } catch let error as CompressNIOError where error == .bufferOverflow {
-                process(window)
+                try process(window)
                 window.moveReaderIndex(to: 0)
                 window.moveWriterIndex(to: 0)
             }
@@ -234,7 +268,7 @@ extension ByteBuffer {
                     try compressStream(to: &window, with: compressor, flush: .sync)
                     break
                 } catch let error as CompressNIOError where error == .bufferOverflow {
-                    process(window)
+                    try process(window)
                     window.moveReaderIndex(to: 0)
                     window.moveWriterIndex(to: 0)
                 }
@@ -245,7 +279,7 @@ extension ByteBuffer {
                     try compressStream(to: &window, with: compressor, flush: .finish)
                     break
                 } catch let error as CompressNIOError where error == .bufferOverflow {
-                    process(window)
+                    try process(window)
                     window.moveReaderIndex(to: 0)
                     window.moveWriterIndex(to: 0)
                 }
@@ -254,7 +288,70 @@ extension ByteBuffer {
 
         if flush == .finish {
             if window.readableBytes > 0 {
-                process(window)
+                try process(window)
+                window.moveReaderIndex(to: 0)
+                window.moveWriterIndex(to: 0)
+            }
+        }
+        compressor.window = window
+    }
+
+    /// A version of compressStream which you provide a fixed sized window buffer to and a process closure. 
+    /// 
+    /// When the window buffer is full the process closure is called. If there is any unprocessed data left 
+    /// at the end of the compress the process closure is called with this.
+    ///
+    /// Before calling this you need to provide a working window `ByteBuffer` to the compressor by setting 
+    /// `NIOCompressor.window`.
+    ///
+    /// - Parameters:
+    ///   - compressor: Algorithm to use when compressing
+    ///   - flush: how compressor should flush output data.
+    ///   - process: Closure to be called when window buffer fills up or compress has finished
+    /// - Returns: `ByteBuffer` containing compressed data
+    public mutating func compressStream(
+        with compressor: NIOCompressor, 
+        flush: CompressNIOFlush, 
+        process: (ByteBuffer) async throws -> ()
+    ) async throws {
+        guard var window = compressor.window else { preconditionFailure("compressString(with:flush:process requires your compressor has a window buffer") }
+        while self.readableBytes > 0 {
+            do {
+                try compressStream(to: &window, with: compressor, flush: .no)
+            } catch let error as CompressNIOError where error == .bufferOverflow {
+                try await process(window)
+                window.moveReaderIndex(to: 0)
+                window.moveWriterIndex(to: 0)
+            }
+        }
+        
+        if flush == .sync {
+            while true {
+                do {
+                    try compressStream(to: &window, with: compressor, flush: .sync)
+                    break
+                } catch let error as CompressNIOError where error == .bufferOverflow {
+                    try await process(window)
+                    window.moveReaderIndex(to: 0)
+                    window.moveWriterIndex(to: 0)
+                }
+            }
+        } else if flush == .finish {
+            while true {
+                do {
+                    try compressStream(to: &window, with: compressor, flush: .finish)
+                    break
+                } catch let error as CompressNIOError where error == .bufferOverflow {
+                    try await process(window)
+                    window.moveReaderIndex(to: 0)
+                    window.moveWriterIndex(to: 0)
+                }
+            }
+        }
+
+        if flush == .finish {
+            if window.readableBytes > 0 {
+                try await process(window)
                 window.moveReaderIndex(to: 0)
                 window.moveWriterIndex(to: 0)
             }

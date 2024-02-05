@@ -1,8 +1,9 @@
-// swift-tools-version:5.4
+// swift-tools-version:5.7
 import PackageDescription
 
 let package = Package(
     name: "compress-nio",
+    platforms: [.macOS(.v10_15), .iOS(.v13), .tvOS(.v13)],
     products: [
         .library(name: "CompressNIO", targets: ["CompressNIO"]),
     ],
