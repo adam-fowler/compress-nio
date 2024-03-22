@@ -3,7 +3,6 @@ import PackageDescription
 
 let package = Package(
     name: "compress-nio",
-    platforms: [.macOS(.v10_15), .iOS(.v13), .tvOS(.v13)],
     products: [
         .library(name: "CompressNIO", targets: ["CompressNIO"]),
     ],
@@ -12,14 +11,16 @@ let package = Package(
     ],
     targets: [
         .target(name: "CompressNIO", dependencies: [
-            .product(name: "NIOCore", package: "swift-nio"), 
+            .product(name: "NIOCore", package: "swift-nio"),
             .byName(name: "CCompressZlib")
         ]),
-        .target(name: "CCompressZlib",
-                dependencies: [],
-                linkerSettings: [
-                    .linkedLibrary("z")
-                ]),
+        .target(
+            name: "CCompressZlib",
+            dependencies: [],
+            linkerSettings: [
+                .linkedLibrary("z")
+            ]
+        ),
         .testTarget(name: "CompressNIOTests", dependencies: ["CompressNIO"]),
     ]
 )
