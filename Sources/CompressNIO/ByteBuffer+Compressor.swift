@@ -98,6 +98,8 @@ extension ByteBuffer {
                 try process(window)
                 window.moveReaderIndex(to: 0)
                 window.moveWriterIndex(to: 0)
+            } catch let error as CompressNIOError where error == .inputBufferOverflow {
+                // can ignore CompressNIOError.inputBufferOverflow errors here
             }
         }
 
@@ -146,6 +148,8 @@ extension ByteBuffer {
                 try self.decompressStream(to: &buffer, with: decompressor)
             } catch let error as CompressNIOError where error == CompressNIOError.bufferOverflow {
                 try _decompress(iteration: iteration + 1, bufferSize: bufferSize)
+            } catch let error as CompressNIOError where error == .inputBufferOverflow {
+                // can ignore CompressNIOError.inputBufferOverflow errors here
             }
         }
 
@@ -196,7 +200,11 @@ extension ByteBuffer {
         to byteBuffer: inout ByteBuffer,
         with decompressor: NIODecompressor
     ) throws {
-        try decompressor.streamInflate(from: &self, to: &byteBuffer)
+        do {
+            try decompressor.streamInflate(from: &self, to: &byteBuffer)
+        } catch let error as CompressNIOError where error == .inputBufferOverflow {
+            // can ignore CompressNIOError.inputBufferOverflow errors here
+        }
     }
 
     /// A version of compressStream which you provide a fixed sized window buffer to and a process closure.
@@ -352,6 +360,8 @@ extension ByteBuffer {
                 try await process(window)
                 window.moveReaderIndex(to: 0)
                 window.moveWriterIndex(to: 0)
+            } catch let error as CompressNIOError where error == .inputBufferOverflow {
+                // can ignore CompressNIOError.inputBufferOverflow errors here
             }
         }
 

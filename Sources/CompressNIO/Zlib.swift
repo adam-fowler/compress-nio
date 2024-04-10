@@ -308,7 +308,11 @@ final class ZlibDecompressor: NIODecompressor {
                     throw CompressNIOError.bufferOverflow
                 }
             case Z_BUF_ERROR:
-                throw CompressNIOError.bufferOverflow
+                if self.stream.avail_in == 0 {
+                    throw CompressNIOError.inputBufferOverflow
+                } else {
+                    throw CompressNIOError.bufferOverflow
+                }
             case Z_DATA_ERROR:
                 throw CompressNIOError.corruptData
             case Z_MEM_ERROR:
