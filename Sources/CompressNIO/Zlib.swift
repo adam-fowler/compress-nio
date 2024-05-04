@@ -3,9 +3,9 @@ import CCompressZlib
 import NIOCore
 
 /// Zlib library configuration
-public struct ZlibConfiguration {
+public struct ZlibConfiguration: Sendable {
     /// Compression Strategy
-    public enum Strategy {
+    public enum Strategy: Sendable {
         /// default compression strategy
         case `default`
         /// Force Huffman encoding only (no string match)
