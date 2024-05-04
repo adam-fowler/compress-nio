@@ -1,7 +1,7 @@
 
 /// Compression Algorithm type
-public struct CompressionAlgorithm: CustomStringConvertible {
-    fileprivate enum AlgorithmEnum {
+public struct CompressionAlgorithm: CustomStringConvertible, Sendable {
+    fileprivate enum AlgorithmEnum: Sendable {
         case gzip(configuration: ZlibConfiguration)
         case zlib(configuration: ZlibConfiguration)
         case deflate(configuration: ZlibConfiguration)
