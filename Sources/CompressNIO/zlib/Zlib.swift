@@ -2,6 +2,13 @@
 import CCompressZlib
 import NIOCore
 
+/// Zlib algorithm
+public enum ZlibAlgorithm {
+    case gzip
+    case zlib
+    case deflate
+}
+
 /// Zlib library configuration
 public struct ZlibConfiguration: Sendable {
     /// Compression Strategy
@@ -65,15 +72,23 @@ public struct ZlibConfiguration: Sendable {
 }
 
 /// Compressor using Zlib
-final class ZlibCompressor: NIOCompressor {
+public struct ZlibCompressor: ~Copyable {
     let configuration: ZlibConfiguration
     var stream: z_stream
     var isActive: Bool
 
-    init(configuration: ZlibConfiguration) {
+    public init(algorithm: ZlibAlgorithm, configuration: ZlibConfiguration = .init()) {
+        var configuration = configuration
+        switch algorithm {
+        case .gzip:
+            configuration.windowSize = 16 + configuration.windowSize
+        case .zlib:
+            break
+        case .deflate:
+            configuration.windowSize = -configuration.windowSize
+        }
         self.configuration = configuration
         self.isActive = false
-        self.window = nil
 
         self.stream = z_stream()
         self.stream.zalloc = nil
@@ -83,13 +98,12 @@ final class ZlibCompressor: NIOCompressor {
 
     deinit {
         if isActive {
-            try? finishStream()
+            var stream = self.stream
+            deflateEnd(&stream)
         }
     }
 
-    var window: ByteBuffer?
-
-    func startStream() throws {
+    public mutating func startStream() throws {
         assert(!self.isActive)
 
         // zlib docs say: The application must initialize zalloc, zfree and opaque before calling the init function.
@@ -116,7 +130,13 @@ final class ZlibCompressor: NIOCompressor {
         self.isActive = true
     }
 
-    func streamDeflate(from: inout ByteBuffer, to: inout ByteBuffer, flush: CompressNIOFlush) throws {
+    public mutating func deflate(from: inout ByteBuffer, to: inout ByteBuffer) throws {
+        try self.startStream()
+        try self.streamDeflate(from: &from, to: &to, flush: .finish)
+        try self.finishStream()
+    }
+
+    public mutating func streamDeflate(from: inout ByteBuffer, to: inout ByteBuffer, flush: CompressNIOFlush) throws {
         assert(self.isActive)
         var bytesRead = 0
         var bytesWritten = 0
@@ -164,7 +184,7 @@ final class ZlibCompressor: NIOCompressor {
         }
     }
 
-    func finishDeflate(to: inout ByteBuffer) throws {
+    public mutating func finishDeflate(to: inout ByteBuffer) throws {
         assert(self.isActive)
         var bytesWritten = 0
 
@@ -197,11 +217,9 @@ final class ZlibCompressor: NIOCompressor {
         }
     }
 
-    func finishStream() throws {
+    public mutating func finishStream() throws {
         assert(self.isActive)
         self.isActive = false
-        self.window?.moveReaderIndex(to: 0)
-        self.window?.moveWriterIndex(to: 0)
 
         let rt = deflateEnd(&self.stream)
         switch rt {
@@ -212,7 +230,7 @@ final class ZlibCompressor: NIOCompressor {
         }
     }
 
-    func maxSize(from: ByteBuffer) -> Int {
+    public mutating func maxSize(from: ByteBuffer) -> Int {
         // deflateBound() provides an upper limit on the number of bytes the input can
         // compress to. We add 5 bytes to handle the fact that Z_SYNC_FLUSH will append
         // an empty stored block that is 5 bytes long.
@@ -227,7 +245,7 @@ final class ZlibCompressor: NIOCompressor {
         return bufferSize + 6
     }
 
-    func resetStream() throws {
+    public mutating func resetStream() throws {
         assert(self.isActive)
         // deflateReset is a more optimal than calling finish and then start
         let rt = deflateReset(&self.stream)
@@ -241,26 +259,34 @@ final class ZlibCompressor: NIOCompressor {
 }
 
 /// Decompressor using Zlib
-final class ZlibDecompressor: NIODecompressor {
+public struct ZlibDecompressor: ~Copyable {
     let windowSize: Int32
     var isActive: Bool
     var stream = z_stream()
 
-    init(windowSize: Int32) {
+    public init(algorithm: ZlibAlgorithm, windowSize: Int32 = 15) {
+        var windowSize = windowSize
+        switch algorithm {
+        case .gzip:
+            windowSize = 16 + windowSize
+        case .zlib:
+            break
+        case .deflate:
+            windowSize = -windowSize
+        }
+
         self.windowSize = windowSize
         self.isActive = false
-        self.window = nil
     }
 
     deinit {
         if isActive {
-            try? finishStream()
+            var stream = self.stream
+            inflateEnd(&stream)
         }
     }
 
-    var window: ByteBuffer?
-
-    func startStream() throws {
+    public mutating func startStream() throws {
         assert(!self.isActive)
 
         // zlib docs say: The application must initialize zalloc, zfree and opaque before calling the init function.
@@ -282,7 +308,13 @@ final class ZlibDecompressor: NIODecompressor {
         self.isActive = true
     }
 
-    func streamInflate(from: inout ByteBuffer, to: inout ByteBuffer) throws {
+    public mutating func inflate(from: inout ByteBuffer, to: inout ByteBuffer) throws {
+        try self.startStream()
+        try self.streamInflate(from: &from, to: &to)
+        try self.finishStream()
+    }
+
+    public mutating func streamInflate(from: inout ByteBuffer, to: inout ByteBuffer) throws {
         assert(self.isActive)
         var bytesRead = 0
         var bytesWritten = 0
@@ -325,7 +357,7 @@ final class ZlibDecompressor: NIODecompressor {
         }
     }
 
-    func finishStream() throws {
+    public mutating func finishStream() throws {
         assert(self.isActive)
         self.isActive = false
         let rt = inflateEnd(&self.stream)
@@ -339,7 +371,7 @@ final class ZlibDecompressor: NIODecompressor {
         }
     }
 
-    func resetStream() throws {
+    public mutating func resetStream() throws {
         assert(self.isActive)
         // inflateReset is a more optimal than calling finish and then start
         let rt = inflateReset(&self.stream)
