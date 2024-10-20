@@ -3,7 +3,7 @@ import CCompressZlib
 import NIOCore
 
 /// Zlib algorithm
-public enum ZlibAlgorithm {
+public enum ZlibAlgorithm: Sendable {
     case gzip
     case zlib
     case deflate
