@@ -23,14 +23,12 @@ public struct CompressionAlgorithm: CustomStringConvertible, Sendable {
     /// - Parameter windowSize: Window size to use in compressor. Window size is 2^windowSize
     public var compressor: NIOCompressor {
         switch self.algorithm {
-        case .gzip(var configuration):
-            configuration.windowSize = 16 + configuration.windowSize
-            return ZlibCompressor(configuration: configuration)
+        case .gzip(let configuration):
+            return ZlibCompressorWrapper(configuration: configuration, algorithm: .gzip)
         case .zlib(let configuration):
-            return ZlibCompressor(configuration: configuration)
-        case .deflate(var configuration):
-            configuration.windowSize = -configuration.windowSize
-            return ZlibCompressor(configuration: configuration)
+            return ZlibCompressorWrapper(configuration: configuration, algorithm: .zlib)
+        case .deflate(let configuration):
+            return ZlibCompressorWrapper(configuration: configuration, algorithm: .deflate)
         }
     }
 
@@ -40,11 +38,11 @@ public struct CompressionAlgorithm: CustomStringConvertible, Sendable {
     public var decompressor: NIODecompressor {
         switch self.algorithm {
         case .gzip(let configuration):
-            return ZlibDecompressor(windowSize: 16 + configuration.windowSize)
+            return ZlibDecompressorWrapper(windowSize: configuration.windowSize, algorithm: .gzip)
         case .zlib(let configuration):
-            return ZlibDecompressor(windowSize: configuration.windowSize)
+            return ZlibDecompressorWrapper(windowSize: configuration.windowSize, algorithm: .zlib)
         case .deflate(let configuration):
-            return ZlibDecompressor(windowSize: -configuration.windowSize)
+            return ZlibDecompressorWrapper(windowSize: configuration.windowSize, algorithm: .deflate)
         }
     }
 
