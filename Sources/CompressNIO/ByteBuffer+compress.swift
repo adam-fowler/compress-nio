@@ -25,8 +25,9 @@ extension ByteBuffer {
         allocator: ByteBufferAllocator = ByteBufferAllocator()
     ) throws -> ByteBuffer {
         let compressor = algorithm.compressor
+        try compressor.startStream()
         var buffer = allocator.buffer(capacity: compressor.maxSize(from: self))
-        try compressor.deflate(from: &self, to: &buffer)
+        try compressor.streamDeflate(from: &self, to: &buffer, flush: .finish)
         return buffer
     }
 

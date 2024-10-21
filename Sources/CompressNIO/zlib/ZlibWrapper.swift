@@ -4,66 +4,82 @@ import NIOCore
 
 /// Compressor using Zlib
 final class ZlibCompressorWrapper: NIOCompressor {
-    var zlibCompressor: ZlibCompressor
+    let algorithm: ZlibAlgorithm
+    let configuration: ZlibConfiguration
+    var zlibCompressor: ZlibCompressor?
+    var window: ByteBuffer?
 
     init(configuration: ZlibConfiguration, algorithm: ZlibAlgorithm) {
-        self.zlibCompressor = .init(algorithm: algorithm, configuration: configuration)
+        self.algorithm = algorithm
+        self.configuration = configuration
+        self.zlibCompressor = nil
         self.window = nil
     }
 
-    var window: ByteBuffer?
 
     func startStream() throws {
-        try self.zlibCompressor.startStream()
+        try self.zlibCompressor = .init(algorithm: self.algorithm, configuration: self.configuration)
     }
 
     func streamDeflate(from: inout ByteBuffer, to: inout ByteBuffer, flush: CompressNIOFlush) throws {
-        try self.zlibCompressor.streamDeflate(from: &from, to: &to, flush: flush)
+        guard let compressor = self.zlibCompressor else { throw CompressNIOError.uninitializedStream }
+        try compressor.deflate(from: &from, to: &to, flush: flush)
     }
 
     func finishDeflate(to: inout ByteBuffer) throws {
-        try self.zlibCompressor.finishDeflate(to: &to)
+        guard let compressor = self.zlibCompressor else { throw CompressNIOError.uninitializedStream }
+        var emptyByteBuffer = ByteBuffer()
+        try compressor.deflate(from: &emptyByteBuffer, to: &to, flush: .finish)
     }
 
     func finishStream() throws {
-        try self.zlibCompressor.finishStream()
+        self.zlibCompressor = nil
         self.window?.moveReaderIndex(to: 0)
         self.window?.moveWriterIndex(to: 0)
     }
 
     func maxSize(from: ByteBuffer) -> Int {
-        self.zlibCompressor.maxSize(from: from)
+        guard let compressor = self.zlibCompressor else { preconditionFailure("Cannot get maxSize from uninitialized stream") }
+        return compressor.maxSize(from: from)
     }
 
     func resetStream() throws {
-        try self.zlibCompressor.resetStream()
+        guard let compressor = self.zlibCompressor else { throw CompressNIOError.uninitializedStream }
+        try compressor.reset()
     }
 }
 
 /// Decompressor using Zlib
 final class ZlibDecompressorWrapper: NIODecompressor {
-    var zlibDecompressor: ZlibDecompressor
+    let algorithm: ZlibAlgorithm
+    let windowSize: Int32
+    var zlibDecompressor: ZlibDecompressor?
+    var window: ByteBuffer?
 
     init(windowSize: Int32, algorithm: ZlibAlgorithm) {
-        self.zlibDecompressor = .init(algorithm: algorithm, windowSize: windowSize)
+        self.algorithm = algorithm
+        self.windowSize = windowSize
+        self.zlibDecompressor = nil
         self.window = nil
     }
 
-    var window: ByteBuffer?
-
     func startStream() throws {
-        try self.zlibDecompressor.startStream()
+        try self.zlibDecompressor = .init(algorithm: self.algorithm, windowSize: self.windowSize)
     }
 
     func streamInflate(from: inout ByteBuffer, to: inout ByteBuffer) throws {
-        try self.zlibDecompressor.streamInflate(from: &from, to: &to)
+        guard let decompressor = self.zlibDecompressor else { throw CompressNIOError.uninitializedStream }
+        try decompressor.inflate(from: &from, to: &to)
     }
 
     func finishStream() throws {
-        try self.zlibDecompressor.finishStream()
+        self.zlibDecompressor = nil
+        self.window?.moveReaderIndex(to: 0)
+        self.window?.moveWriterIndex(to: 0)
     }
 
     func resetStream() throws {
-        try self.zlibDecompressor.resetStream()
+        guard let decompressor = self.zlibDecompressor else { throw CompressNIOError.uninitializedStream }
+        try decompressor.reset()
     }
 }

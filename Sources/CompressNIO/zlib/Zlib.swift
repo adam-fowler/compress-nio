@@ -72,12 +72,16 @@ public struct ZlibConfiguration: Sendable {
 }
 
 /// Compressor using Zlib
-public struct ZlibCompressor: ~Copyable {
-    let configuration: ZlibConfiguration
+public final class ZlibCompressor {
     var stream: z_stream
-    var isActive: Bool
 
-    public init(algorithm: ZlibAlgorithm, configuration: ZlibConfiguration = .init()) {
+    /// Initialize Zlib deflate stream for compression
+    /// - Parameters:
+    ///   - algorithm: Zlib algorithm
+    ///   - configuration: Zlib configuration
+    ///
+    /// - Throws: ``CompressNIOError`` if deflate stream fails to initialize
+    public init(algorithm: ZlibAlgorithm, configuration: ZlibConfiguration = .init()) throws {
         var configuration = configuration
         switch algorithm {
         case .gzip:
@@ -87,37 +91,19 @@ public struct ZlibCompressor: ~Copyable {
         case .deflate:
             configuration.windowSize = -configuration.windowSize
         }
-        self.configuration = configuration
-        self.isActive = false
 
         self.stream = z_stream()
-        self.stream.zalloc = nil
-        self.stream.zfree = nil
-        self.stream.opaque = nil
-    }
-
-    deinit {
-        if isActive {
-            var stream = self.stream
-            deflateEnd(&stream)
-        }
-    }
-
-    public mutating func startStream() throws {
-        assert(!self.isActive)
-
-        // zlib docs say: The application must initialize zalloc, zfree and opaque before calling the init function.
         self.stream.zalloc = nil
         self.stream.zfree = nil
         self.stream.opaque = nil
 
         let rt = CCompressZlib_deflateInit2(
             &self.stream,
-            self.configuration.compressionLevel,
+            configuration.compressionLevel,
             Z_DEFLATED,
-            self.configuration.windowSize,
-            self.configuration.memoryLevel,
-            self.configuration.strategy.zlibValue
+            configuration.windowSize,
+            configuration.memoryLevel,
+            configuration.strategy.zlibValue
         )
         switch rt {
         case Z_MEM_ERROR:
@@ -127,17 +113,20 @@ public struct ZlibCompressor: ~Copyable {
         default:
             throw CompressNIOError.internalError
         }
-        self.isActive = true
     }
 
-    public mutating func deflate(from: inout ByteBuffer, to: inout ByteBuffer) throws {
-        try self.startStream()
-        try self.streamDeflate(from: &from, to: &to, flush: .finish)
-        try self.finishStream()
+    deinit {
+        var stream = self.stream
+        deflateEnd(&stream)
     }
 
-    public mutating func streamDeflate(from: inout ByteBuffer, to: inout ByteBuffer, flush: CompressNIOFlush) throws {
-        assert(self.isActive)
+    ///  Deflate Zlib stream
+    /// - Parameters:
+    ///   - from: source bytebuffer
+    ///   - to: output bytebuffer
+    ///   - flush: whether deflate should flush the output
+    /// - Throws: ``CompressNIOError`` if deflate fails
+    public func deflate(from: inout ByteBuffer, to: inout ByteBuffer, flush: CompressNIOFlush) throws {
         var bytesRead = 0
         var bytesWritten = 0
 
@@ -184,53 +173,7 @@ public struct ZlibCompressor: ~Copyable {
         }
     }
 
-    public mutating func finishDeflate(to: inout ByteBuffer) throws {
-        assert(self.isActive)
-        var bytesWritten = 0
-
-        defer {
-            to.moveWriterIndex(forwardBy: bytesWritten)
-        }
-
-        try to.withUnsafeMutableWritableBytes { toBuffer in
-            self.stream.avail_in = 0
-            self.stream.next_in = nil
-            self.stream.avail_out = UInt32(toBuffer.count)
-            self.stream.next_out = CCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
-
-            let rt = CCompressZlib.deflate(&self.stream, Z_FINISH)
-            bytesWritten = self.stream.next_out - CCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
-            switch rt {
-            case Z_OK:
-                throw CompressNIOError.bufferOverflow
-            case Z_DATA_ERROR:
-                throw CompressNIOError.corruptData
-            case Z_BUF_ERROR:
-                throw CompressNIOError.bufferOverflow
-            case Z_MEM_ERROR:
-                throw CompressNIOError.noMoreMemory
-            case Z_STREAM_END:
-                break
-            default:
-                throw CompressNIOError.internalError
-            }
-        }
-    }
-
-    public mutating func finishStream() throws {
-        assert(self.isActive)
-        self.isActive = false
-
-        let rt = deflateEnd(&self.stream)
-        switch rt {
-        case Z_OK:
-            break
-        default:
-            throw CompressNIOError.internalError
-        }
-    }
-
-    public mutating func maxSize(from: ByteBuffer) -> Int {
+    public func maxSize(from: ByteBuffer) -> Int {
         // deflateBound() provides an upper limit on the number of bytes the input can
         // compress to. We add 5 bytes to handle the fact that Z_SYNC_FLUSH will append
         // an empty stored block that is 5 bytes long.
@@ -245,9 +188,9 @@ public struct ZlibCompressor: ~Copyable {
         return bufferSize + 6
     }
 
-    public mutating func resetStream() throws {
-        assert(self.isActive)
-        // deflateReset is a more optimal than calling finish and then start
+    /// Reset deflate stream
+    /// - Throws: ``CompressNIOError`` if reset fails
+    public func reset() throws {
         let rt = deflateReset(&self.stream)
         switch rt {
         case Z_OK:
@@ -259,12 +202,16 @@ public struct ZlibCompressor: ~Copyable {
 }
 
 /// Decompressor using Zlib
-public struct ZlibDecompressor: ~Copyable {
-    let windowSize: Int32
-    var isActive: Bool
-    var stream = z_stream()
+public final class ZlibDecompressor {
+    var stream: z_stream
 
-    public init(algorithm: ZlibAlgorithm, windowSize: Int32 = 15) {
+    /// Initialize Zlib inflate stream for decompression
+    /// - Parameters:
+    ///   - algorithm: Zlib algorithm
+    ///   - windowSize: Window size used to inflate stream 8...15
+    ///
+    /// - Throws: ``CompressNIOError`` if inflate stream fails to initialize
+    public init(algorithm: ZlibAlgorithm, windowSize: Int32 = 15) throws {
         var windowSize = windowSize
         switch algorithm {
         case .gzip:
@@ -275,20 +222,7 @@ public struct ZlibDecompressor: ~Copyable {
             windowSize = -windowSize
         }
 
-        self.windowSize = windowSize
-        self.isActive = false
-    }
-
-    deinit {
-        if isActive {
-            var stream = self.stream
-            inflateEnd(&stream)
-        }
-    }
-
-    public mutating func startStream() throws {
-        assert(!self.isActive)
-
+        self.stream = z_stream()
         // zlib docs say: The application must initialize zalloc, zfree and opaque before calling the init function.
         self.stream.zalloc = nil
         self.stream.zfree = nil
@@ -296,7 +230,7 @@ public struct ZlibDecompressor: ~Copyable {
         self.stream.avail_in = 0
         self.stream.next_in = nil
 
-        let rt = CCompressZlib_inflateInit2(&self.stream, self.windowSize)
+        let rt = CCompressZlib_inflateInit2(&self.stream, windowSize)
         switch rt {
         case Z_MEM_ERROR:
             throw CompressNIOError.noMoreMemory
@@ -305,17 +239,20 @@ public struct ZlibDecompressor: ~Copyable {
         default:
             throw CompressNIOError.internalError
         }
-        self.isActive = true
     }
 
-    public mutating func inflate(from: inout ByteBuffer, to: inout ByteBuffer) throws {
-        try self.startStream()
-        try self.streamInflate(from: &from, to: &to)
-        try self.finishStream()
+    deinit {
+        var stream = self.stream
+        inflateEnd(&stream)
     }
 
-    public mutating func streamInflate(from: inout ByteBuffer, to: inout ByteBuffer) throws {
-        assert(self.isActive)
+    /// Inflate Zlib stream
+    /// - Parameters:
+    ///   - from: source bytebuffer
+    ///   - to: output bytebuffer
+    ///
+    /// - Throws: ``CompressNIOError`` if inflate fails
+    public func inflate(from: inout ByteBuffer, to: inout ByteBuffer) throws {
         var bytesRead = 0
         var bytesWritten = 0
 
@@ -357,22 +294,9 @@ public struct ZlibDecompressor: ~Copyable {
         }
     }
 
-    public mutating func finishStream() throws {
-        assert(self.isActive)
-        self.isActive = false
-        let rt = inflateEnd(&self.stream)
-        switch rt {
-        case Z_DATA_ERROR:
-            throw CompressNIOError.unfinished
-        case Z_OK:
-            break
-        default:
-            throw CompressNIOError.internalError
-        }
-    }
-
-    public mutating func resetStream() throws {
-        assert(self.isActive)
+    /// Reset Zlib inflate stream 
+    /// - Throws: ``CompressNIOError`` if reset fails
+    public func reset() throws {
         // inflateReset is a more optimal than calling finish and then start
         let rt = inflateReset(&self.stream)
         switch rt {

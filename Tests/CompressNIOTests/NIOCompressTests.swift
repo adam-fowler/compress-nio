@@ -337,13 +337,13 @@ class CompressNIOTests: XCTestCase {
         let buffer = self.createRandomBuffer(size: 1024)
         var bufferToCompress = buffer
         let compressor = CompressionAlgorithm.gzip().compressor
+        try compressor.startStream()
         var outputBuffer = ByteBufferAllocator().buffer(capacity: compressor.maxSize(from: bufferToCompress))
         let buffer2 = self.createRandomBuffer(size: 1024)
         var bufferToCompress2 = buffer2
         let compressor2 = CompressionAlgorithm.gzip().compressor
-        var outputBuffer2 = ByteBufferAllocator().buffer(capacity: compressor2.maxSize(from: bufferToCompress2))
-        try compressor.startStream()
         try compressor2.startStream()
+        var outputBuffer2 = ByteBufferAllocator().buffer(capacity: compressor2.maxSize(from: bufferToCompress2))
         try bufferToCompress.compressStream(to: &outputBuffer, with: compressor, flush: .finish)
         try bufferToCompress2.compressStream(to: &outputBuffer2, with: compressor2, flush: .finish)
         try compressor.finishStream()

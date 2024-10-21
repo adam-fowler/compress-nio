@@ -55,29 +55,25 @@ class CompressZlibTests: XCTestCase {
 
     func streamCompress(_ algorithm: ZlibAlgorithm, configuration: ZlibConfiguration = .init(), buffer: inout ByteBuffer, blockSize: Int = 1024) throws -> ByteBuffer {
         // compress
-        var compressor = ZlibCompressor(algorithm: algorithm, configuration: configuration)
-        try compressor.startStream()
+        let compressor = try ZlibCompressor(algorithm: algorithm, configuration: configuration)
         var compressedBuffer = ByteBufferAllocator().buffer(capacity: buffer.readableBytes)
 
         while buffer.readableBytes > 0 {
             let size = min(blockSize, buffer.readableBytes)
             var slice = buffer.readSlice(length: size)!
-            var compressedSlice = try slice.compressStream(with: &compressor, flush: .no)
+            var compressedSlice = try slice.compressStream(with: compressor, flush: .sync)
             compressedBuffer.writeBuffer(&compressedSlice)
             compressedSlice.discardReadBytes()
             buffer.discardReadBytes()
         }
         var emptyBuffer = ByteBufferAllocator().buffer(capacity: 0)
-//        var compressedEmptyBuffer = ByteBufferAllocator().buffer(capacity: 16000)
-        try emptyBuffer.compressStream(to: &compressedBuffer, with: &compressor, flush: .finish)
-//        compressedBuffer.writeBuffer(&compressedEmptyBuffer)
-        try compressor.finishStream()
+        var compressedEndBuffer = try emptyBuffer.compressStream(with: compressor, flush: .finish)
+        compressedBuffer.writeBuffer(&compressedEndBuffer)
         return compressedBuffer
     }
 
     func streamBlockCompress(_ algorithm: ZlibAlgorithm, configuration: ZlibConfiguration = .init(), buffer: inout ByteBuffer, blockSize: Int = 1024) throws -> [ByteBuffer] {
-        var compressor = ZlibCompressor(algorithm: algorithm, configuration: configuration)
-        try compressor.startStream()
+        let compressor = try ZlibCompressor(algorithm: algorithm, configuration: configuration)
         var compressedBuffers: [ByteBuffer] = []
         let minBlockSize = blockSize / 2
         var blockSize = blockSize
@@ -87,46 +83,41 @@ class CompressZlibTests: XCTestCase {
             blockSize = max(blockSize, minBlockSize)
             let size = min(blockSize, buffer.readableBytes)
             var slice = buffer.readSlice(length: size)!
-            var compressedSlice = try slice.compressStream(with: &compressor, flush: .sync)
+            var compressedSlice = try slice.compressStream(with: compressor, flush: .sync)
             compressedBuffers.append(compressedSlice)
             compressedSlice.discardReadBytes()
             buffer.discardReadBytes()
         }
         var emptyBuffer = ByteBufferAllocator().buffer(capacity: 0)
-        let compressedEmptyBlock = try emptyBuffer.compressStream(with: &compressor, flush: .finish)
+        let compressedEmptyBlock = try emptyBuffer.compressStream(with: compressor, flush: .finish)
         compressedBuffers.append(compressedEmptyBlock)
-        try compressor.finishStream()
 
         return compressedBuffers
     }
 
     func streamDecompress(_ algorithm: ZlibAlgorithm, configuration: ZlibConfiguration = .init(), from: inout ByteBuffer, to: inout ByteBuffer, blockSize: Int = 1024) throws {
         // decompress
-        var decompressor = ZlibDecompressor(algorithm: algorithm, windowSize: configuration.windowSize)
-        try decompressor.startStream()
+        let decompressor = try ZlibDecompressor(algorithm: algorithm, windowSize: configuration.windowSize)
         while from.readableBytes > 0 {
             let size = min(blockSize, from.readableBytes)
             var slice = from.readSlice(length: size)!
             var writeOutBuffer = ByteBufferAllocator().buffer(capacity: to.writableBytes)
-            try slice.decompressStream(to: &writeOutBuffer, with: &decompressor)
+            try slice.decompressStream(to: &writeOutBuffer, with: decompressor)
             to.writeBuffer(&writeOutBuffer)
             writeOutBuffer.discardReadBytes()
             from.discardReadBytes()
         }
-        try decompressor.finishStream()
     }
 
     func streamBlockDecompress(_ algorithm: ZlibAlgorithm, configuration: ZlibConfiguration = .init(), from: [ByteBuffer], to: inout ByteBuffer) throws {
-        var decompressor = ZlibDecompressor(algorithm: algorithm, windowSize: configuration.windowSize)
-        try decompressor.startStream()
+        let decompressor = try ZlibDecompressor(algorithm: algorithm, windowSize: configuration.windowSize)
         for var buffer in from {
             var writeOutBuffer = ByteBufferAllocator().buffer(capacity: to.writableBytes)
-            try buffer.decompressStream(to: &writeOutBuffer, with: &decompressor)
+            try buffer.decompressStream(to: &writeOutBuffer, with: decompressor)
             to.writeBuffer(&writeOutBuffer)
             writeOutBuffer.discardReadBytes()
             buffer.discardReadBytes()
         }
-        try decompressor.finishStream()
     }
 
     func testStreamCompressDecompress(_ algorithm: ZlibAlgorithm, configuration: ZlibConfiguration = .init(), bufferSize: Int = 16384, blockSize: Int = 1024) throws {
@@ -191,21 +182,19 @@ class CompressZlibTests: XCTestCase {
         var window = ByteBufferAllocator().buffer(capacity: windowSize)
         var bufferToCompress = buffer
 
-        var compressor = ZlibCompressor(algorithm: algorithm, configuration: configuration)
-        try compressor.startStream()
+        let compressor = try ZlibCompressor(algorithm: algorithm, configuration: configuration)
         var compressedBuffer = ByteBufferAllocator().buffer(capacity: 0)
 
         while bufferToCompress.readableBytes > 0 {
             let size = min(bufferToCompress.readableBytes, streamBufferSize)
             let flush: CompressNIOFlush = bufferToCompress.readableBytes - size == 0 ? .finish : .no
             var slice = bufferToCompress.readSlice(length: size)!
-            try slice.compressStream(with: &compressor, window: &window, flush: flush) { window in
+            try slice.compressStream(with: compressor, window: &window, flush: flush) { window in
                 var window = window
                 compressedBuffer.writeBuffer(&window)
             }
             bufferToCompress.discardReadBytes()
         }
-        try compressor.finishStream()
 
         let uncompressedBuffer = try compressedBuffer.decompress(with: algorithm)
 
@@ -221,35 +210,29 @@ class CompressZlibTests: XCTestCase {
         var compressedBuffer = try bufferToCompress.compress(with: algorithm)
 
         var uncompressedBuffer = ByteBufferAllocator().buffer(capacity: 0)
-        var decompressor = ZlibDecompressor(algorithm: algorithm, windowSize: configuration.windowSize)
-        try decompressor.startStream()
+        let decompressor = try ZlibDecompressor(algorithm: algorithm, windowSize: configuration.windowSize)
 
         while compressedBuffer.readableBytes > 0 {
             let size = min(compressedBuffer.readableBytes, streamBufferSize)
             var slice = compressedBuffer.readSlice(length: size)!
-            try slice.decompressStream(with: &decompressor, window: &window) { window in
+            try slice.decompressStream(with: decompressor, window: &window) { window in
                 var window = window
                 uncompressedBuffer.writeBuffer(&window)
             }
             compressedBuffer.discardReadBytes()
         }
 
-        try decompressor.finishStream()
         XCTAssertEqual(buffer, uncompressedBuffer)
     }
 
     func testCompressionAlgorithm(_ algorithm: ZlibAlgorithm, configuration: ZlibConfiguration) throws {
         let buffer = self.createRandomBuffer(size: 10240, randomness: 20)
         var buffer1 = buffer
-        var compressor = ZlibCompressor(algorithm: algorithm, configuration: configuration)
-        try compressor.startStream()
-        var compressedBuffer = try buffer1.compressStream(with: &compressor, flush: .finish)
-        try compressor.finishStream()
+        let compressor = try ZlibCompressor(algorithm: algorithm, configuration: configuration)
+        var compressedBuffer = try buffer1.compressStream(with: compressor, flush: .finish)
 
-        var decompressor = ZlibDecompressor(algorithm: algorithm, windowSize: configuration.windowSize)
-        try decompressor.startStream()
-        let buffer2 = try compressedBuffer.decompressStream(with: &decompressor)
-        try decompressor.finishStream()
+        let decompressor = try ZlibDecompressor(algorithm: algorithm, windowSize: configuration.windowSize)
+        let buffer2 = try compressedBuffer.decompressStream(with: decompressor)
 
         XCTAssertEqual(buffer, buffer2)
     }
@@ -287,7 +270,7 @@ class CompressZlibTests: XCTestCase {
     }
 
     func testRawDeflateBlockStreamCompressDecompress() throws {
-        try self.testStreamCompressDecompress(.deflate)
+        try self.testStreamCompressDecompress(.deflate, bufferSize: 256000)
     }
 
     func testCompressWithWindow() throws {
@@ -321,31 +304,26 @@ class CompressZlibTests: XCTestCase {
         var buffer5 = ByteBuffer(bytes: [0xCA, 0x2F, 0x02, 0x0A, 0x2B, 0xF9, 0x7B, 0x2B, 0xE9, 0x40, 0xA4, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF])
         var buffer6 = ByteBuffer(bytes: [0x42, 0x91, 0x72, 0xCE, 0xC9, 0x07, 0x00, 0x00, 0x00, 0xFF, 0xFF])
 
-        var decompressor = ZlibDecompressor(algorithm: .deflate)
-        try decompressor.startStream()
-        _ = try buffer1.decompressStream(with: &decompressor, maxSize: 65536)
-        _ = try buffer2.decompressStream(with: &decompressor, maxSize: 65536)
-        _ = try buffer3.decompressStream(with: &decompressor, maxSize: 65536)
-        _ = try buffer4.decompressStream(with: &decompressor, maxSize: 65536)
-        _ = try buffer5.decompressStream(with: &decompressor, maxSize: 65536)
-        _ = try buffer6.decompressStream(with: &decompressor, maxSize: 65536)
+        let decompressor = try ZlibDecompressor(algorithm: .deflate)
+        _ = try buffer1.decompressStream(with: decompressor, maxSize: 65536)
+        _ = try buffer2.decompressStream(with: decompressor, maxSize: 65536)
+        _ = try buffer3.decompressStream(with: decompressor, maxSize: 65536)
+        _ = try buffer4.decompressStream(with: decompressor, maxSize: 65536)
+        _ = try buffer5.decompressStream(with: decompressor, maxSize: 65536)
+        _ = try buffer6.decompressStream(with: decompressor, maxSize: 65536)
     }
 
     func testTwoStreamsInParallel() throws {
         let buffer = self.createRandomBuffer(size: 1024)
         var bufferToCompress = buffer
-        var compressor = ZlibCompressor(algorithm: .gzip)
+        let compressor = try ZlibCompressor(algorithm: .gzip)
         var outputBuffer = ByteBufferAllocator().buffer(capacity: compressor.maxSize(from: bufferToCompress))
         let buffer2 = self.createRandomBuffer(size: 1024)
         var bufferToCompress2 = buffer2
-        var compressor2 = ZlibCompressor(algorithm: .gzip)
+        let compressor2 = try ZlibCompressor(algorithm: .gzip)
         var outputBuffer2 = ByteBufferAllocator().buffer(capacity: compressor2.maxSize(from: bufferToCompress2))
-        try compressor.startStream()
-        try compressor2.startStream()
-        try bufferToCompress.compressStream(to: &outputBuffer, with: &compressor, flush: .finish)
-        try bufferToCompress2.compressStream(to: &outputBuffer2, with: &compressor2, flush: .finish)
-        try compressor.finishStream()
-        try compressor2.finishStream()
+        try bufferToCompress.compressStream(to: &outputBuffer, with: compressor, flush: .finish)
+        try bufferToCompress2.compressStream(to: &outputBuffer2, with: compressor2, flush: .finish)
         var uncompressedBuffer = ByteBufferAllocator().buffer(capacity: 1024)
         try outputBuffer.decompress(to: &uncompressedBuffer, with: .gzip())
         XCTAssertEqual(buffer, uncompressedBuffer)
@@ -383,9 +361,8 @@ class CompressZlibTests: XCTestCase {
         var buffer = self.createRandomBuffer(size: 1024)
         var outputBuffer = ByteBufferAllocator().buffer(capacity: 16)
         do {
-            var compressor = ZlibCompressor(algorithm: .gzip)
-            try compressor.startStream()
-            try buffer.compressStream(to: &outputBuffer, with: &compressor, flush: .finish)
+            let compressor = try ZlibCompressor(algorithm: .gzip)
+            try buffer.compressStream(to: &outputBuffer, with: compressor, flush: .finish)
             XCTFail("Shouldn't get here")
         } catch let error as CompressNIOError where error == CompressNIOError.bufferOverflow {
         } catch {
@@ -396,16 +373,14 @@ class CompressZlibTests: XCTestCase {
     func testRetryCompressAfterOverflowError() throws {
         let buffer = self.createConsistentRandomBuffer(444, 10659, size: 5041, randomness: 34)
         var bufferToCompress = buffer
-        var compressor = ZlibCompressor(algorithm: .deflate)
-        try compressor.startStream()
+        let compressor = try ZlibCompressor(algorithm: .deflate)
         var compressedBuffer = ByteBufferAllocator().buffer(capacity: 2048)
         do {
-            try bufferToCompress.compressStream(to: &compressedBuffer, with: &compressor, flush: .finish)
+            try bufferToCompress.compressStream(to: &compressedBuffer, with: compressor, flush: .finish)
             XCTFail("Shouldn't get here")
         } catch let error as CompressNIOError where error == CompressNIOError.bufferOverflow {
             var compressedBuffer2 = ByteBufferAllocator().buffer(capacity: 2048)
-            try bufferToCompress.compressStream(to: &compressedBuffer2, with: &compressor, flush: .finish)
-            try compressor.finishStream()
+            try bufferToCompress.compressStream(to: &compressedBuffer2, with: compressor, flush: .finish)
             compressedBuffer.writeBuffer(&compressedBuffer2)
             var outputBuffer = ByteBufferAllocator().buffer(capacity: 5041)
             try compressedBuffer.decompress(to: &outputBuffer, with: .deflate())
@@ -417,10 +392,9 @@ class CompressZlibTests: XCTestCase {
         // create buffer that compresses to exactly 4096 bytes
         let buffer = self.createConsistentRandomBuffer(444, 10659, size: 5041, randomness: 34)
         var bufferToCompress = buffer
-        var compressor = ZlibCompressor(algorithm: .deflate)
-        try compressor.startStream()
+        let compressor = try ZlibCompressor(algorithm: .deflate)
         var compressedBuffer = ByteBufferAllocator().buffer(capacity: 4096)
-        try bufferToCompress.compressStream(to: &compressedBuffer, with: &compressor, flush: .finish)
+        try bufferToCompress.compressStream(to: &compressedBuffer, with: compressor, flush: .finish)
     }
 
     func testDecompressWithOverflowError() {
@@ -440,19 +414,17 @@ class CompressZlibTests: XCTestCase {
         let buffer = self.createRandomBuffer(size: 1024)
         var bufferToCompress = buffer
         var compressedBuffer = try bufferToCompress.compress(with: .gzip())
-        var decompressor = ZlibDecompressor(algorithm: .gzip)
-        try decompressor.startStream()
+        let decompressor = try ZlibDecompressor(algorithm: .gzip)
         var outputBuffer = ByteBufferAllocator().buffer(capacity: 512)
         do {
-            try compressedBuffer.decompressStream(to: &outputBuffer, with: &decompressor)
+            try compressedBuffer.decompressStream(to: &outputBuffer, with: decompressor)
             XCTFail("Shouldn't get here")
         } catch let error as CompressNIOError where error == CompressNIOError.bufferOverflow {
             var outputBuffer2 = ByteBufferAllocator().buffer(capacity: 1024)
-            try compressedBuffer.decompressStream(to: &outputBuffer2, with: &decompressor)
+            try compressedBuffer.decompressStream(to: &outputBuffer2, with: decompressor)
             outputBuffer.writeBuffer(&outputBuffer2)
             XCTAssertEqual(outputBuffer, buffer)
         }
-        try decompressor.finishStream()
     }
 
     func testAllocatingDecompress() throws {

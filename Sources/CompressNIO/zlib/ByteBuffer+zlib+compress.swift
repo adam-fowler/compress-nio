@@ -11,8 +11,8 @@ extension ByteBuffer {
     ///     - `NIOCompression.Error.bufferOverflow` if output byte buffer doesnt have enough space to
     ///         write the compressed data into
     public mutating func compress(to buffer: inout ByteBuffer, with algorithm: ZlibAlgorithm, configuration: ZlibConfiguration = .init()) throws {
-        var compressor = ZlibCompressor(algorithm: algorithm, configuration: configuration)
-        try compressor.deflate(from: &self, to: &buffer)
+        let compressor = try ZlibCompressor(algorithm: algorithm, configuration: configuration)
+        try compressor.deflate(from: &self, to: &buffer, flush: .finish)
     }
 
     /// Allocate a new byte buffer and compress this byte buffer into it using the compression algorithm specified
@@ -25,9 +25,9 @@ extension ByteBuffer {
         configuration: ZlibConfiguration = .init(),
         allocator: ByteBufferAllocator = ByteBufferAllocator()
     ) throws -> ByteBuffer {
-        var compressor = ZlibCompressor(algorithm: algorithm, configuration: configuration)
+        let compressor = try ZlibCompressor(algorithm: algorithm, configuration: configuration)
         var buffer = allocator.buffer(capacity: compressor.maxSize(from: self))
-        try compressor.deflate(from: &self, to: &buffer)
+        try compressor.deflate(from: &self, to: &buffer, flush: .finish)
         return buffer
     }
 
@@ -45,14 +45,14 @@ extension ByteBuffer {
     ///   - process: Closure to be called when window buffer fills up or compress has finished
     /// - Returns: `ByteBuffer` containing compressed data
     public mutating func compressStream(
-        with compressor: inout ZlibCompressor,
+        with compressor: ZlibCompressor,
         window: inout ByteBuffer,
         flush: CompressNIOFlush,
         process: (ByteBuffer) throws -> Void
     ) throws {
         while self.readableBytes > 0 {
             do {
-                try self.compressStream(to: &window, with: &compressor, flush: .no)
+                try self.compressStream(to: &window, with: compressor, flush: .no)
             } catch let error as CompressNIOError where error == .bufferOverflow {
                 try process(window)
                 window.moveReaderIndex(to: 0)
@@ -63,7 +63,7 @@ extension ByteBuffer {
         if flush == .sync {
             while true {
                 do {
-                    try self.compressStream(to: &window, with: &compressor, flush: .sync)
+                    try self.compressStream(to: &window, with: compressor, flush: .sync)
                     break
                 } catch let error as CompressNIOError where error == .bufferOverflow {
                     try process(window)
@@ -74,7 +74,7 @@ extension ByteBuffer {
         } else if flush == .finish {
             while true {
                 do {
-                    try self.compressStream(to: &window, with: &compressor, flush: .finish)
+                    try self.compressStream(to: &window, with: compressor, flush: .finish)
                     break
                 } catch let error as CompressNIOError where error == .bufferOverflow {
                     try process(window)
@@ -107,12 +107,12 @@ extension ByteBuffer {
     ///     - `NIOCompression.Error.bufferOverflow` if the allocated byte buffer doesn't have enough space to write the decompressed data into
     /// - Returns: `ByteBuffer` containing compressed data
     public mutating func compressStream(
-        with compressor: inout ZlibCompressor,
+        with compressor: ZlibCompressor,
         flush: CompressNIOFlush,
         allocator: ByteBufferAllocator = ByteBufferAllocator()
     ) throws -> ByteBuffer {
         var byteBuffer = allocator.buffer(capacity: compressor.maxSize(from: self))
-        try self.compressStream(to: &byteBuffer, with: &compressor, flush: flush)
+        try self.compressStream(to: &byteBuffer, with: compressor, flush: flush)
         return byteBuffer
     }
 
@@ -148,10 +148,10 @@ extension ByteBuffer {
     ///     - `NIOCompression.Error.bufferOverflow` if output byte buffer doesn't have enough space to write the compressed data into
     public mutating func compressStream(
         to byteBuffer: inout ByteBuffer,
-        with compressor: inout ZlibCompressor,
+        with compressor: ZlibCompressor,
         flush: CompressNIOFlush
     ) throws {
-        try compressor.streamDeflate(from: &self, to: &byteBuffer, flush: flush)
+        try compressor.deflate(from: &self, to: &byteBuffer, flush: flush)
     }
 
     /// A version of compressStream which you provide a fixed sized window buffer to and a process closure.
@@ -168,14 +168,14 @@ extension ByteBuffer {
     ///   - process: Closure to be called when window buffer fills up or compress has finished
     /// - Returns: `ByteBuffer` containing compressed data
     public mutating func compressStream(
-        with compressor: inout ZlibCompressor,
+        with compressor: ZlibCompressor,
         window: inout ByteBuffer,
         flush: CompressNIOFlush,
         process: (ByteBuffer) async throws -> Void
     ) async throws {
         while self.readableBytes > 0 {
             do {
-                try self.compressStream(to: &window, with: &compressor, flush: .no)
+                try self.compressStream(to: &window, with: compressor, flush: .no)
             } catch let error as CompressNIOError where error == .bufferOverflow {
                 try await process(window)
                 window.moveReaderIndex(to: 0)
@@ -186,7 +186,7 @@ extension ByteBuffer {
         if flush == .sync {
             while true {
                 do {
-                    try self.compressStream(to: &window, with: &compressor, flush: .sync)
+                    try self.compressStream(to: &window, with: compressor, flush: .sync)
                     break
                 } catch let error as CompressNIOError where error == .bufferOverflow {
                     try await process(window)
@@ -197,7 +197,7 @@ extension ByteBuffer {
         } else if flush == .finish {
             while true {
                 do {
-                    try self.compressStream(to: &window, with: &compressor, flush: .finish)
+                    try self.compressStream(to: &window, with: compressor, flush: .finish)
                     break
                 } catch let error as CompressNIOError where error == .bufferOverflow {
                     try await process(window)

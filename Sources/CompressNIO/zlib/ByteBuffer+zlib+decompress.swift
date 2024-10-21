@@ -18,7 +18,7 @@ extension ByteBuffer {
         with algorithm: ZlibAlgorithm,
         configuration: ZlibConfiguration = .init()
     ) throws {
-        var decompressor = ZlibDecompressor(algorithm: algorithm, windowSize: configuration.windowSize)
+        let decompressor = try ZlibDecompressor(algorithm: algorithm, windowSize: configuration.windowSize)
         try decompressor.inflate(from: &self, to: &buffer)
     }
 
@@ -43,10 +43,8 @@ extension ByteBuffer {
         maxSize: Int = .max,
         allocator: ByteBufferAllocator = ByteBufferAllocator()
     ) throws -> ByteBuffer {
-        var decompressor = ZlibDecompressor(algorithm: algorithm, windowSize: configuration.windowSize)
-        try decompressor.startStream()
-        let buffer = try decompressStream(with: &decompressor, maxSize: maxSize, allocator: allocator)
-        try decompressor.finishStream()
+        let decompressor = try ZlibDecompressor(algorithm: algorithm, windowSize: configuration.windowSize)
+        let buffer = try decompressStream(with: decompressor, maxSize: maxSize, allocator: allocator)
         return buffer
     }
 
@@ -63,13 +61,13 @@ extension ByteBuffer {
     ///   - process: Closure to be called when window buffer fills up or decompress has finished
     /// - Returns: `ByteBuffer` containing compressed data
     public mutating func decompressStream(
-        with decompressor: inout ZlibDecompressor,
+        with decompressor: ZlibDecompressor,
         window: inout ByteBuffer,
         process: (ByteBuffer) throws -> Void
     ) throws {
         while self.readableBytes > 0 {
             do {
-                try self.decompressStream(to: &window, with: &decompressor)
+                try self.decompressStream(to: &window, with: decompressor)
             } catch let error as CompressNIOError where error == .bufferOverflow {
                 try process(window)
                 window.moveReaderIndex(to: 0)
@@ -97,7 +95,7 @@ extension ByteBuffer {
     ///   - allocator: Byte buffer allocator used to allocate the new `ByteBuffer`
     /// - Returns: `ByteBuffer` containing compressed data
     public mutating func decompressStream(
-        with decompressor: inout ZlibDecompressor,
+        with decompressor: ZlibDecompressor,
         maxSize: Int = .max,
         allocator: ByteBufferAllocator = ByteBufferAllocator()
     ) throws -> ByteBuffer {
@@ -121,7 +119,7 @@ extension ByteBuffer {
                         buffers.append(buffer)
                     }
                 }
-                try self.decompressStream(to: &buffer, with: &decompressor)
+                try self.decompressStream(to: &buffer, with: decompressor)
             } catch let error as CompressNIOError where error == CompressNIOError.bufferOverflow {
                 try _decompress(iteration: iteration + 1, bufferSize: bufferSize)
             } catch let error as CompressNIOError where error == .inputBufferOverflow {
@@ -174,10 +172,10 @@ extension ByteBuffer {
     ///     - `NIOCompression.Error.corruptData` if the input byte buffer is corrupted
     public mutating func decompressStream(
         to byteBuffer: inout ByteBuffer,
-        with decompressor: inout ZlibDecompressor
+        with decompressor: ZlibDecompressor
     ) throws {
         do {
-            try decompressor.streamInflate(from: &self, to: &byteBuffer)
+            try decompressor.inflate(from: &self, to: &byteBuffer)
         } catch let error as CompressNIOError where error == .inputBufferOverflow {
             // can ignore CompressNIOError.inputBufferOverflow errors here
         }
@@ -196,13 +194,13 @@ extension ByteBuffer {
     ///   - process: Closure to be called when window buffer fills up or decompress has finished
     /// - Returns: `ByteBuffer` containing compressed data
     public mutating func decompressStream(
-        with decompressor: inout ZlibDecompressor,
+        with decompressor: ZlibDecompressor,
         window: inout ByteBuffer,
         process: (ByteBuffer) async throws -> Void
     ) async throws {
         while self.readableBytes > 0 {
             do {
-                try self.decompressStream(to: &window, with: &decompressor)
+                try self.decompressStream(to: &window, with: decompressor)
             } catch let error as CompressNIOError where error == .bufferOverflow {
                 try await process(window)
                 window.moveReaderIndex(to: 0)
