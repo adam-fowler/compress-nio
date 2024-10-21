@@ -102,4 +102,23 @@ extension NIOCompressor {
         try finishStream()
         try startStream()
     }
+
+    @available(*, deprecated, message: "This function isn't used anymore")
+    public func finishWindowedStream(process: (ByteBuffer)->()) throws {
+        guard var window = self.window else { preconditionFailure("finishWindowedStream requires your compressor has a window buffer") }
+        while true {
+            do {
+                try finishDeflate(to: &window)
+                break
+            } catch let error as CompressNIOError where error == .bufferOverflow {
+                process(window)
+                window.moveReaderIndex(to: 0)
+                window.moveWriterIndex(to: 0)
+            }
+        }
+
+        if window.readableBytes > 0 {
+            process(window)
+        }
+    }
 }
