@@ -10,9 +10,9 @@ extension ByteBuffer {
     /// - Throws:
     ///     - `NIOCompression.Error.bufferOverflow` if output byte buffer doesnt have enough space to
     ///         write the compressed data into
-    public mutating func compress(to buffer: inout ByteBuffer, with algorithm: CompressionAlgorithm) throws {
-        let compressor = algorithm.compressor
-        try compressor.deflate(from: &self, to: &buffer)
+    public mutating func compress(to buffer: inout ByteBuffer, with algorithm: ZlibAlgorithm, configuration: ZlibConfiguration = .init()) throws {
+        let compressor = try ZlibCompressor(algorithm: algorithm, configuration: configuration)
+        try compressor.deflate(from: &self, to: &buffer, flush: .finish)
     }
 
     /// Allocate a new byte buffer and compress this byte buffer into it using the compression algorithm specified
@@ -21,13 +21,13 @@ extension ByteBuffer {
     ///   - allocator: Byte buffer allocator used to create new byte buffer
     /// - Returns: the new byte buffer with the compressed data
     public mutating func compress(
-        with algorithm: CompressionAlgorithm,
+        with algorithm: ZlibAlgorithm,
+        configuration: ZlibConfiguration = .init(),
         allocator: ByteBufferAllocator = ByteBufferAllocator()
     ) throws -> ByteBuffer {
-        let compressor = algorithm.compressor
-        try compressor.startStream()
+        let compressor = try ZlibCompressor(algorithm: algorithm, configuration: configuration)
         var buffer = allocator.buffer(capacity: compressor.maxSize(from: self))
-        try compressor.streamDeflate(from: &self, to: &buffer, flush: .finish)
+        try compressor.deflate(from: &self, to: &buffer, flush: .finish)
         return buffer
     }
 
@@ -45,11 +45,11 @@ extension ByteBuffer {
     ///   - process: Closure to be called when window buffer fills up or compress has finished
     /// - Returns: `ByteBuffer` containing compressed data
     public mutating func compressStream(
-        with compressor: NIOCompressor,
+        with compressor: ZlibCompressor,
+        window: inout ByteBuffer,
         flush: CompressNIOFlush,
         process: (ByteBuffer) throws -> Void
     ) throws {
-        guard var window = compressor.window else { preconditionFailure("compressString(with:flush:process requires your compressor has a window buffer") }
         while self.readableBytes > 0 {
             do {
                 try self.compressStream(to: &window, with: compressor, flush: .no)
@@ -91,7 +91,6 @@ extension ByteBuffer {
                 window.moveWriterIndex(to: 0)
             }
         }
-        compressor.window = window
     }
 
     /// A version of compressStream which allocates the ByteBuffer to write into.
@@ -108,7 +107,7 @@ extension ByteBuffer {
     ///     - `NIOCompression.Error.bufferOverflow` if the allocated byte buffer doesn't have enough space to write the decompressed data into
     /// - Returns: `ByteBuffer` containing compressed data
     public mutating func compressStream(
-        with compressor: NIOCompressor,
+        with compressor: ZlibCompressor,
         flush: CompressNIOFlush,
         allocator: ByteBufferAllocator = ByteBufferAllocator()
     ) throws -> ByteBuffer {
@@ -149,15 +148,12 @@ extension ByteBuffer {
     ///     - `NIOCompression.Error.bufferOverflow` if output byte buffer doesn't have enough space to write the compressed data into
     public mutating func compressStream(
         to byteBuffer: inout ByteBuffer,
-        with compressor: NIOCompressor,
+        with compressor: ZlibCompressor,
         flush: CompressNIOFlush
     ) throws {
-        try compressor.streamDeflate(from: &self, to: &byteBuffer, flush: flush)
+        try compressor.deflate(from: &self, to: &byteBuffer, flush: flush)
     }
-}
 
-@available(macOS 10.15, iOS 13, tvOS 13, *)
-extension ByteBuffer {
     /// A version of compressStream which you provide a fixed sized window buffer to and a process closure.
     ///
     /// When the window buffer is full the process closure is called. If there is any unprocessed data left
@@ -172,11 +168,11 @@ extension ByteBuffer {
     ///   - process: Closure to be called when window buffer fills up or compress has finished
     /// - Returns: `ByteBuffer` containing compressed data
     public mutating func compressStream(
-        with compressor: NIOCompressor,
+        with compressor: ZlibCompressor,
+        window: inout ByteBuffer,
         flush: CompressNIOFlush,
         process: (ByteBuffer) async throws -> Void
     ) async throws {
-        guard var window = compressor.window else { preconditionFailure("compressString(with:flush:process requires your compressor has a window buffer") }
         while self.readableBytes > 0 {
             do {
                 try self.compressStream(to: &window, with: compressor, flush: .no)
@@ -216,21 +212,6 @@ extension ByteBuffer {
                 try await process(window)
                 window.moveReaderIndex(to: 0)
                 window.moveWriterIndex(to: 0)
-            }
-        }
-        compressor.window = window
-    }
-}
-
-extension ByteBuffer {
-    /// Process unsafe version of readable data and write out to unsafe writable data of another ByteBuffer
-    /// - Parameters:
-    ///   - to: Target `ByteBuffer`
-    ///   - closure: Process closure
-    public mutating func withUnsafeProcess(to: inout ByteBuffer, closure: (UnsafeMutableRawBufferPointer, UnsafeMutableRawBufferPointer) throws -> Void) throws {
-        try self.withUnsafeMutableReadableBytes { fromBuffer in
-            try to.withUnsafeMutableWritableBytes { toBuffer in
-                try closure(fromBuffer, toBuffer)
             }
         }
     }

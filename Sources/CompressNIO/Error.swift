@@ -10,6 +10,7 @@ public struct CompressNIOError: Swift.Error, CustomStringConvertible, Equatable 
         case noMoreMemory
         case unfinished
         case internalError
+        case uninitializedStream
     }
 
     fileprivate let error: ErrorEnum
@@ -27,6 +28,8 @@ public struct CompressNIOError: Swift.Error, CustomStringConvertible, Equatable 
     public static let noMoreMemory = CompressNIOError(error: .noMoreMemory)
     /// called `streamFinish`while there is still data to process
     public static let unfinished = CompressNIOError(error: .unfinished)
+    /// called stream function while stream was unintialised
+    public static let uninitializedStream = CompressNIOError(error: .uninitializedStream)
     /// error internal to system
     public static let internalError = CompressNIOError(error: .internalError)
 }
