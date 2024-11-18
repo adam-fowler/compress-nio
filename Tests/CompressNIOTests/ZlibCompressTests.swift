@@ -282,18 +282,18 @@ class CompressZlibTests: XCTestCase {
     }
 
     func testWindowSize() throws {
-        try self.testCompressionAlgorithm(.gzip, configuration: .init(windowSize: 9))
-        try self.testCompressionAlgorithm(.deflate, configuration: .init(windowSize: 12))
+        try self.testCompressionAlgorithm(.gzip, configuration: .init(windowSize: .window2k))
+        try self.testCompressionAlgorithm(.deflate, configuration: .init(windowSize: .window16k))
     }
 
     func testCompressionLevel() throws {
-        try self.testCompressionAlgorithm(.gzip, configuration: .init(compressionLevel: 4))
-        try self.testCompressionAlgorithm(.deflate, configuration: .init(compressionLevel: 9))
+        try self.testCompressionAlgorithm(.gzip, configuration: .init(compressionLevel: .compressionLevel4))
+        try self.testCompressionAlgorithm(.deflate, configuration: .init(compressionLevel: .bestCompression))
     }
 
     func testMemoryLevel() throws {
-        try self.testCompressionAlgorithm(.gzip, configuration: .init(memoryLevel: 2))
-        try self.testCompressionAlgorithm(.deflate, configuration: .init(memoryLevel: 9))
+        try self.testCompressionAlgorithm(.gzip, configuration: .init(memoryLevel: .memory2K))
+        try self.testCompressionAlgorithm(.deflate, configuration: .init(memoryLevel: .memory256K))
     }
 
     func testDecompressWithInputBufferError() throws {

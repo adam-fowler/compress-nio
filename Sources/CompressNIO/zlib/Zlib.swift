@@ -11,6 +11,52 @@ public enum ZlibAlgorithm: Sendable {
 
 /// Zlib library configuration
 public struct ZlibConfiguration: Sendable {
+    /// Compression Level. Lower the value is the faster the compression, higher the value is
+    /// better the compression
+    public enum CompressionLevel: Int32 {
+        case noCompression = 0
+        case fastestCompression = 1
+        case compressionLevel2 = 2
+        case compressionLevel3 = 3
+        case compressionLevel4 = 4
+        case compressionLevel5 = 5
+        case compressionLevel6 = 6
+        case compressionLevel7 = 7
+        case compressionLevel8 = 8
+        case bestCompression = 9
+        case defaultCompressionLevel = -1
+    }
+
+    /// How much memory is allocated for internal compression state, the smaller the amount
+    /// of memory the slower compression is. Memory allocated is (1 << (memLevel+9))
+    public enum MemoryLevel: Int32 {
+        case memory1k = 1
+        case memory2K = 2
+        case memory4K = 3
+        case memory8K = 4
+        case memory16K = 5
+        case memory32K = 6
+        case memory64K = 7
+        case memory128K = 8
+        case memory256K = 9
+
+        public static var defaultMemoryLevel: Self { .memory128K }
+    }
+
+    /// How much memory is allocated for the compression/history window. Larger sizes produce
+    /// better compression. Buffer size is (1 << (windowBits+2))
+    public enum WindowSize: Int32 {
+        case window2k = 9
+        case window4k = 10
+        case window8k = 11
+        case window16k = 12
+        case window32k = 13
+        case window64k = 14
+        case window128k = 15
+
+        public static var defaultWindowSize: Self { .window128k }
+    }
+
     /// Compression Strategy
     public enum Strategy: Sendable {
         /// default compression strategy
@@ -54,12 +100,13 @@ public struct ZlibConfiguration: Sendable {
 
     ///  Initialise ZlibConfiguration
     /// - Parameters:
-    ///   - windowSize: Base two logarithm of the window size. eg 9 is 512, 10 is 1024
+    ///   - windowSize: Base two logarithm of the window size. eg 9 is 2048, 10 is 4096
     ///   - compressionLevel: Level of compression. Value between 0 and 9 where 1 is fastest, 9 is best compression and
     ///         0 is no compression
     ///   - memoryLevel: Amount of memory to use when compressing. Less memory will mean the compression will take longer
     ///         and compression level will be reduced. Value between 1 - 9 where 1 is least amount of memory.
     ///   - strategy: Strategy when compressing
+    @_disfavoredOverload
     public init(windowSize: Int32 = 15, compressionLevel: Int32 = Z_DEFAULT_COMPRESSION, memoryLevel: Int32 = 8, strategy: Strategy = .default) {
         assert((9...15).contains(windowSize), "Window size must be between the values 9 and 15")
         assert((-1...9).contains(compressionLevel), "Compression level must be between the values 0 and 9, or -1 indicating the default value")
@@ -67,6 +114,24 @@ public struct ZlibConfiguration: Sendable {
         self.windowSize = windowSize
         self.compressionLevel = compressionLevel
         self.memoryLevel = memoryLevel
+        self.strategy = strategy
+    }
+
+    ///  Initialise ZlibConfiguration
+    /// - Parameters:
+    ///   - windowSize: Size of compression/history window
+    ///   - compressionLevel: Level of compression
+    ///   - memoryLevel: Amount of memory used for compression state
+    ///   - strategy: Strategy when compressing
+    public init(
+        windowSize: WindowSize = .defaultWindowSize,
+        compressionLevel: CompressionLevel = .defaultCompressionLevel,
+        memoryLevel: MemoryLevel = .defaultMemoryLevel,
+        strategy: Strategy = .default
+    ) {
+        self.windowSize = windowSize.rawValue
+        self.compressionLevel = compressionLevel.rawValue
+        self.memoryLevel = memoryLevel.rawValue
         self.strategy = strategy
     }
 }
@@ -294,7 +359,7 @@ public final class ZlibDecompressor {
         }
     }
 
-    /// Reset Zlib inflate stream 
+    /// Reset Zlib inflate stream
     /// - Throws: ``CompressNIOError`` if reset fails
     public func reset() throws {
         // inflateReset is a more optimal than calling finish and then start
