@@ -138,6 +138,10 @@ public struct ZlibConfiguration: Sendable {
 
 /// Compressor using Zlib
 public final class ZlibCompressor {
+    // zlib expects the z_stream pointer to stay the same over the whole process, so we need to
+    // ensure that it doesn't accidentally get copied or moved. There is no 'safe' way to signal
+    // that a variable can't be moved in Swift (like ~Copyable), so we wrap it in an
+    // UnsafeMutablePointer, so any move or copy has to be explicit.
     var stream: UnsafeMutablePointer<z_stream>
 
     /// Initialize Zlib deflate stream for compression
@@ -271,6 +275,10 @@ public final class ZlibCompressor {
 
 /// Decompressor using Zlib
 public final class ZlibDecompressor {
+    // zlib expects the z_stream pointer to stay the same over the whole process, so we need to
+    // ensure that it doesn't accidentally get copied or moved. There is no 'safe' way to signal
+    // that a variable can't be moved in Swift (like ~Copyable), so we wrap it in an
+    // UnsafeMutablePointer, so any move or copy has to be explicit.
     var stream: UnsafeMutablePointer<z_stream>
 
     /// Initialize Zlib inflate stream for decompression
