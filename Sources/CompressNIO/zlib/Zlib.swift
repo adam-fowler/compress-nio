@@ -138,7 +138,11 @@ public struct ZlibConfiguration: Sendable {
 
 /// Compressor using Zlib
 public final class ZlibCompressor {
-    var stream: z_stream
+    // zlib expects the z_stream pointer to stay the same over the whole process, so we need to
+    // ensure that it doesn't accidentally get copied or moved. There is no 'safe' way to signal
+    // that a variable can't be moved in Swift (like ~Copyable), so we wrap it in an
+    // UnsafeMutablePointer, so any move or copy has to be explicit.
+    var stream: UnsafeMutablePointer<z_stream>
 
     /// Initialize Zlib deflate stream for compression
     /// - Parameters:
@@ -157,13 +161,14 @@ public final class ZlibCompressor {
             configuration.windowSize = -configuration.windowSize
         }
 
-        self.stream = z_stream()
-        self.stream.zalloc = nil
-        self.stream.zfree = nil
-        self.stream.opaque = nil
+        self.stream = UnsafeMutablePointer<z_stream>.allocate(capacity: 1)
+        self.stream.initialize(to: z_stream())
+        self.stream.pointee.zalloc = nil
+        self.stream.pointee.zfree = nil
+        self.stream.pointee.opaque = nil
 
         let rt = CCompressZlib_deflateInit2(
-            &self.stream,
+            self.stream,
             configuration.compressionLevel,
             Z_DEFLATED,
             configuration.windowSize,
@@ -181,8 +186,10 @@ public final class ZlibCompressor {
     }
 
     deinit {
-        var stream = self.stream
-        deflateEnd(&stream)
+        let rt = deflateEnd(self.stream)
+        assert(rt == Z_OK, "deflateEnd returned error: \(rt)")
+        self.stream.deinitialize(count: 1)
+        self.stream.deallocate()
     }
 
     ///  Deflate Zlib stream
@@ -211,14 +218,14 @@ public final class ZlibCompressor {
                 flag = Z_FINISH
             }
 
-            self.stream.avail_in = UInt32(fromBuffer.count)
-            self.stream.next_in = CCompressZlib_voidPtr_to_BytefPtr(fromBuffer.baseAddress!)
-            self.stream.avail_out = UInt32(toBuffer.count)
-            self.stream.next_out = CCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
+            self.stream.pointee.avail_in = UInt32(fromBuffer.count)
+            self.stream.pointee.next_in = CCompressZlib_voidPtr_to_BytefPtr(fromBuffer.baseAddress!)
+            self.stream.pointee.avail_out = UInt32(toBuffer.count)
+            self.stream.pointee.next_out = CCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
 
-            let rt = CCompressZlib.deflate(&self.stream, flag)
-            bytesRead = self.stream.next_in - CCompressZlib_voidPtr_to_BytefPtr(fromBuffer.baseAddress!)
-            bytesWritten = self.stream.next_out - CCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
+            let rt = CCompressZlib.deflate(self.stream, flag)
+            bytesRead = self.stream.pointee.next_in - CCompressZlib_voidPtr_to_BytefPtr(fromBuffer.baseAddress!)
+            bytesWritten = self.stream.pointee.next_out - CCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
             switch rt {
             case Z_OK:
                 if flush == .finish {
@@ -249,14 +256,14 @@ public final class ZlibCompressor {
         // some compression algorithms and so it should be used only when necessary. This completes the current deflate block and
         // follows it with an empty stored block that is three bits plus filler bits to the next byte, followed by four bytes
         // (00 00 ff ff)."
-        let bufferSize = Int(CCompressZlib.deflateBound(&self.stream, UInt(from.readableBytes)))
+        let bufferSize = Int(CCompressZlib.deflateBound(self.stream, UInt(from.readableBytes)))
         return bufferSize + 6
     }
 
     /// Reset deflate stream
     /// - Throws: ``CompressNIOError`` if reset fails
     public func reset() throws {
-        let rt = deflateReset(&self.stream)
+        let rt = deflateReset(self.stream)
         switch rt {
         case Z_OK:
             break
@@ -268,7 +275,11 @@ public final class ZlibCompressor {
 
 /// Decompressor using Zlib
 public final class ZlibDecompressor {
-    var stream: z_stream
+    // zlib expects the z_stream pointer to stay the same over the whole process, so we need to
+    // ensure that it doesn't accidentally get copied or moved. There is no 'safe' way to signal
+    // that a variable can't be moved in Swift (like ~Copyable), so we wrap it in an
+    // UnsafeMutablePointer, so any move or copy has to be explicit.
+    var stream: UnsafeMutablePointer<z_stream>
 
     /// Initialize Zlib inflate stream for decompression
     /// - Parameters:
@@ -287,15 +298,16 @@ public final class ZlibDecompressor {
             windowSize = -windowSize
         }
 
-        self.stream = z_stream()
+        self.stream = UnsafeMutablePointer<z_stream>.allocate(capacity: 1)
+        self.stream.initialize(to: z_stream())
         // zlib docs say: The application must initialize zalloc, zfree and opaque before calling the init function.
-        self.stream.zalloc = nil
-        self.stream.zfree = nil
-        self.stream.opaque = nil
-        self.stream.avail_in = 0
-        self.stream.next_in = nil
+        self.stream.pointee.zalloc = nil
+        self.stream.pointee.zfree = nil
+        self.stream.pointee.opaque = nil
+        self.stream.pointee.avail_in = 0
+        self.stream.pointee.next_in = nil
 
-        let rt = CCompressZlib_inflateInit2(&self.stream, windowSize)
+        let rt = CCompressZlib_inflateInit2(self.stream, windowSize)
         switch rt {
         case Z_MEM_ERROR:
             throw CompressNIOError.noMoreMemory
@@ -307,8 +319,10 @@ public final class ZlibDecompressor {
     }
 
     deinit {
-        var stream = self.stream
-        inflateEnd(&stream)
+        let rt = inflateEnd(self.stream)
+        assert(rt == Z_OK, "inflateEnd returned error: \(rt)")
+        self.stream.deinitialize(count: 1)
+        self.stream.deallocate()
     }
 
     /// Inflate Zlib stream
@@ -327,22 +341,22 @@ public final class ZlibDecompressor {
         }
 
         try from.withUnsafeProcess(to: &to) { fromBuffer, toBuffer in
-            self.stream.avail_in = UInt32(fromBuffer.count)
-            self.stream.next_in = CCompressZlib_voidPtr_to_BytefPtr(fromBuffer.baseAddress!)
-            self.stream.avail_out = UInt32(toBuffer.count)
-            self.stream.next_out = CCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
+            self.stream.pointee.avail_in = UInt32(fromBuffer.count)
+            self.stream.pointee.next_in = CCompressZlib_voidPtr_to_BytefPtr(fromBuffer.baseAddress!)
+            self.stream.pointee.avail_out = UInt32(toBuffer.count)
+            self.stream.pointee.next_out = CCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
 
-            let rt = CCompressZlib.inflate(&self.stream, Z_NO_FLUSH)
+            let rt = CCompressZlib.inflate(self.stream, Z_NO_FLUSH)
 
-            bytesRead = self.stream.next_in - CCompressZlib_voidPtr_to_BytefPtr(fromBuffer.baseAddress!)
-            bytesWritten = self.stream.next_out - CCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
+            bytesRead = self.stream.pointee.next_in - CCompressZlib_voidPtr_to_BytefPtr(fromBuffer.baseAddress!)
+            bytesWritten = self.stream.pointee.next_out - CCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
             switch rt {
             case Z_OK:
-                if self.stream.avail_out == 0 {
+                if self.stream.pointee.avail_out == 0 {
                     throw CompressNIOError.bufferOverflow
                 }
             case Z_BUF_ERROR:
-                if self.stream.avail_in == 0 {
+                if self.stream.pointee.avail_in == 0 {
                     throw CompressNIOError.inputBufferOverflow
                 } else {
                     throw CompressNIOError.bufferOverflow
@@ -363,7 +377,7 @@ public final class ZlibDecompressor {
     /// - Throws: ``CompressNIOError`` if reset fails
     public func reset() throws {
         // inflateReset is a more optimal than calling finish and then start
-        let rt = inflateReset(&self.stream)
+        let rt = inflateReset(self.stream)
         switch rt {
         case Z_OK:
             break
