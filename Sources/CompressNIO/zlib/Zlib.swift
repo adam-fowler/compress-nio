@@ -1,4 +1,3 @@
-
 import CCompressZlib
 import NIOCore
 
@@ -107,10 +106,18 @@ public struct ZlibConfiguration: Sendable {
     ///         and compression level will be reduced. Value between 1 - 9 where 1 is least amount of memory.
     ///   - strategy: Strategy when compressing
     @_disfavoredOverload
-    public init(windowSize: Int32 = 15, compressionLevel: Int32 = Z_DEFAULT_COMPRESSION, memoryLevel: Int32 = 8, strategy: Strategy = .default) {
+    public init(
+        windowSize: Int32 = 15, compressionLevel: Int32 = Z_DEFAULT_COMPRESSION,
+        memoryLevel: Int32 = 8, strategy: Strategy = .default
+    ) {
         assert((9...15).contains(windowSize), "Window size must be between the values 9 and 15")
-        assert((-1...9).contains(compressionLevel), "Compression level must be between the values 0 and 9, or -1 indicating the default value")
-        assert((1...9).contains(memoryLevel), "Compression memory level must be between the values 1 and 9")
+        assert(
+            (-1...9).contains(compressionLevel),
+            "Compression level must be between the values 0 and 9, or -1 indicating the default value"
+        )
+        assert(
+            (1...9).contains(memoryLevel),
+            "Compression memory level must be between the values 1 and 9")
         self.windowSize = windowSize
         self.compressionLevel = compressionLevel
         self.memoryLevel = memoryLevel
@@ -187,7 +194,7 @@ public final class ZlibCompressor {
 
     deinit {
         let rt = deflateEnd(self.stream)
-        assert(rt == Z_OK, "deflateEnd returned error: \(rt)")
+        assert(rt != Z_STREAM_ERROR, "deflateEnd returned stream error")
         self.stream.deinitialize(count: 1)
         self.stream.deallocate()
     }
@@ -198,7 +205,9 @@ public final class ZlibCompressor {
     ///   - to: output bytebuffer
     ///   - flush: whether deflate should flush the output
     /// - Throws: ``CompressNIOError`` if deflate fails
-    public func deflate(from: inout ByteBuffer, to: inout ByteBuffer, flush: CompressNIOFlush) throws {
+    public func deflate(from: inout ByteBuffer, to: inout ByteBuffer, flush: CompressNIOFlush)
+        throws
+    {
         var bytesRead = 0
         var bytesWritten = 0
 
@@ -224,8 +233,12 @@ public final class ZlibCompressor {
             self.stream.pointee.next_out = CCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
 
             let rt = CCompressZlib.deflate(self.stream, flag)
-            bytesRead = self.stream.pointee.next_in - CCompressZlib_voidPtr_to_BytefPtr(fromBuffer.baseAddress!)
-            bytesWritten = self.stream.pointee.next_out - CCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
+            bytesRead =
+                self.stream.pointee.next_in
+                - CCompressZlib_voidPtr_to_BytefPtr(fromBuffer.baseAddress!)
+            bytesWritten =
+                self.stream.pointee.next_out
+                - CCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
             switch rt {
             case Z_OK:
                 if flush == .finish {
@@ -320,7 +333,7 @@ public final class ZlibDecompressor {
 
     deinit {
         let rt = inflateEnd(self.stream)
-        assert(rt == Z_OK, "inflateEnd returned error: \(rt)")
+        assert(rt != Z_STREAM_ERROR, "deflateEnd returned stream error")
         self.stream.deinitialize(count: 1)
         self.stream.deallocate()
     }
@@ -348,8 +361,12 @@ public final class ZlibDecompressor {
 
             let rt = CCompressZlib.inflate(self.stream, Z_NO_FLUSH)
 
-            bytesRead = self.stream.pointee.next_in - CCompressZlib_voidPtr_to_BytefPtr(fromBuffer.baseAddress!)
-            bytesWritten = self.stream.pointee.next_out - CCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
+            bytesRead =
+                self.stream.pointee.next_in
+                - CCompressZlib_voidPtr_to_BytefPtr(fromBuffer.baseAddress!)
+            bytesWritten =
+                self.stream.pointee.next_out
+                - CCompressZlib_voidPtr_to_BytefPtr(toBuffer.baseAddress!)
             switch rt {
             case Z_OK:
                 if self.stream.pointee.avail_out == 0 {
