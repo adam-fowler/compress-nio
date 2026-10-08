@@ -273,6 +273,62 @@ class CompressZlibTests: XCTestCase {
         try self.testStreamCompressDecompress(.deflate, bufferSize: 256000)
     }
 
+    /// A sync flush exists so that everything compressed so far can be sent now, for example one
+    /// server-sent event. The window versions of `compressStream` only passed the window to `process`
+    /// when it overflowed or on `.finish`, so the output of a sync flush waited in the window.
+    func syncFlushDeliversOutput(_ algorithm: ZlibAlgorithm) throws {
+        let buffer = self.createRandomBuffer(size: 1024, randomness: 40)
+        var window = ByteBufferAllocator().buffer(capacity: 65536)
+        let compressor = try ZlibCompressor(algorithm: algorithm)
+        var compressedBuffer = ByteBufferAllocator().buffer(capacity: 0)
+
+        var bufferToCompress = buffer
+        try bufferToCompress.compressStream(with: compressor, window: &window, flush: .sync) { window in
+            var window = window
+            compressedBuffer.writeBuffer(&window)
+        }
+        XCTAssertGreaterThan(compressedBuffer.readableBytes, 0, "a sync flush should deliver its output")
+
+        let decompressor = try ZlibDecompressor(algorithm: algorithm)
+        var uncompressedBuffer = ByteBufferAllocator().buffer(capacity: 4096)
+        try compressedBuffer.decompressStream(to: &uncompressedBuffer, with: decompressor)
+        XCTAssertEqual(uncompressedBuffer, buffer)
+
+        // finishing afterwards still produces a valid stream with nothing repeated
+        var emptyBuffer = ByteBufferAllocator().buffer(capacity: 0)
+        try emptyBuffer.compressStream(with: compressor, window: &window, flush: .finish) { window in
+            var window = window
+            compressedBuffer.writeBuffer(&window)
+        }
+        try compressedBuffer.decompressStream(to: &uncompressedBuffer, with: decompressor)
+        XCTAssertEqual(uncompressedBuffer, buffer)
+    }
+
+    func testSyncFlushDeliversOutput() throws {
+        try self.syncFlushDeliversOutput(.gzip)
+        try self.syncFlushDeliversOutput(.zlib)
+        try self.syncFlushDeliversOutput(.deflate)
+    }
+
+    func testSyncFlushDeliversOutputAsync() async throws {
+        let buffer = self.createRandomBuffer(size: 1024, randomness: 40)
+        var window = ByteBufferAllocator().buffer(capacity: 65536)
+        let compressor = try ZlibCompressor(algorithm: .gzip)
+        var compressedBuffer = ByteBufferAllocator().buffer(capacity: 0)
+
+        var bufferToCompress = buffer
+        try await bufferToCompress.compressStream(with: compressor, window: &window, flush: .sync) { window in
+            var window = window
+            compressedBuffer.writeBuffer(&window)
+        }
+        XCTAssertGreaterThan(compressedBuffer.readableBytes, 0, "a sync flush should deliver its output")
+
+        let decompressor = try ZlibDecompressor(algorithm: .gzip)
+        var uncompressedBuffer = ByteBufferAllocator().buffer(capacity: 4096)
+        try compressedBuffer.decompressStream(to: &uncompressedBuffer, with: decompressor)
+        XCTAssertEqual(uncompressedBuffer, buffer)
+    }
+
     func testCompressWithWindow() throws {
         try self.streamCompressWindow(.deflate, inputBufferSize: 240_000, streamBufferSize: 110_000, windowSize: 75000)
     }

@@ -84,7 +84,7 @@ extension ByteBuffer {
             }
         }
 
-        if flush == .finish {
+        if flush == .sync || flush == .finish {
             if window.readableBytes > 0 {
                 try process(window)
                 window.moveReaderIndex(to: 0)
@@ -207,7 +207,7 @@ extension ByteBuffer {
             }
         }
 
-        if flush == .finish {
+        if flush == .sync || flush == .finish {
             if window.readableBytes > 0 {
                 try await process(window)
                 window.moveReaderIndex(to: 0)
