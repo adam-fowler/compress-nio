@@ -1,4 +1,3 @@
-
 import NIOCore
 
 // compress extensions to ByteBuffer
@@ -49,7 +48,9 @@ extension ByteBuffer {
         flush: CompressNIOFlush,
         process: (ByteBuffer) throws -> Void
     ) throws {
-        guard var window = compressor.window else { preconditionFailure("compressString(with:flush:process requires your compressor has a window buffer") }
+        guard var window = compressor.window else {
+            preconditionFailure("compressString(with:flush:process requires your compressor has a window buffer")
+        }
         while self.readableBytes > 0 {
             do {
                 try self.compressStream(to: &window, with: compressor, flush: .no)
@@ -176,7 +177,9 @@ extension ByteBuffer {
         flush: CompressNIOFlush,
         process: (ByteBuffer) async throws -> Void
     ) async throws {
-        guard var window = compressor.window else { preconditionFailure("compressString(with:flush:process requires your compressor has a window buffer") }
+        guard var window = compressor.window else {
+            preconditionFailure("compressString(with:flush:process requires your compressor has a window buffer")
+        }
         while self.readableBytes > 0 {
             do {
                 try self.compressStream(to: &window, with: compressor, flush: .no)
@@ -227,7 +230,10 @@ extension ByteBuffer {
     /// - Parameters:
     ///   - to: Target `ByteBuffer`
     ///   - closure: Process closure
-    public mutating func withUnsafeProcess(to: inout ByteBuffer, closure: (UnsafeMutableRawBufferPointer, UnsafeMutableRawBufferPointer) throws -> Void) throws {
+    public mutating func withUnsafeProcess(
+        to: inout ByteBuffer,
+        closure: (UnsafeMutableRawBufferPointer, UnsafeMutableRawBufferPointer) throws -> Void
+    ) throws {
         try self.withUnsafeMutableReadableBytes { fromBuffer in
             try to.withUnsafeMutableWritableBytes { toBuffer in
                 try closure(fromBuffer, toBuffer)

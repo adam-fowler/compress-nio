@@ -107,8 +107,10 @@ public struct ZlibConfiguration: Sendable {
     ///   - strategy: Strategy when compressing
     @_disfavoredOverload
     public init(
-        windowSize: Int32 = 15, compressionLevel: Int32 = Z_DEFAULT_COMPRESSION,
-        memoryLevel: Int32 = 8, strategy: Strategy = .default
+        windowSize: Int32 = 15,
+        compressionLevel: Int32 = Z_DEFAULT_COMPRESSION,
+        memoryLevel: Int32 = 8,
+        strategy: Strategy = .default
     ) {
         assert((9...15).contains(windowSize), "Window size must be between the values 9 and 15")
         assert(
@@ -117,7 +119,8 @@ public struct ZlibConfiguration: Sendable {
         )
         assert(
             (1...9).contains(memoryLevel),
-            "Compression memory level must be between the values 1 and 9")
+            "Compression memory level must be between the values 1 and 9"
+        )
         self.windowSize = windowSize
         self.compressionLevel = compressionLevel
         self.memoryLevel = memoryLevel
@@ -205,7 +208,11 @@ public final class ZlibCompressor {
     ///   - to: output bytebuffer
     ///   - flush: whether deflate should flush the output
     /// - Throws: ``CompressNIOError`` if deflate fails
-    public func deflate(from: inout ByteBuffer, to: inout ByteBuffer, flush: CompressNIOFlush)
+    public func deflate(
+        from: inout ByteBuffer,
+        to: inout ByteBuffer,
+        flush: CompressNIOFlush
+    )
         throws
     {
         var bytesRead = 0

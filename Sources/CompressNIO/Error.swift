@@ -1,4 +1,3 @@
-
 import NIOCore
 
 /// Errors returned from compression/decompression routines
@@ -16,7 +15,7 @@ public struct CompressNIOError: Swift.Error, CustomStringConvertible, Equatable 
     fileprivate let error: ErrorEnum
 
     /// return as String
-    public var description: String { return self.error.rawValue }
+    public var description: String { self.error.rawValue }
 
     /// output buffer is too small
     public static let bufferOverflow = CompressNIOError(error: .bufferOverflow)

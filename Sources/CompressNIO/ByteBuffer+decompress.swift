@@ -1,4 +1,3 @@
-
 import NIOCore
 
 // Decompress extensions to ByteBuffer
@@ -134,7 +133,7 @@ extension ByteBuffer {
             return buffers[0]
         } else {
             // concatenate all the buffers together
-            let size = buffers.reduce(0) { return $0 + $1.readableBytes }
+            let size = buffers.reduce(0) { $0 + $1.readableBytes }
             var finalBuffer = allocator.buffer(capacity: size)
             for var buffer in buffers {
                 finalBuffer.writeBuffer(&buffer)
