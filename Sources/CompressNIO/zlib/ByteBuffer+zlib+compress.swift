@@ -64,7 +64,14 @@ extension ByteBuffer {
             while true {
                 do {
                     try self.compressStream(to: &window, with: compressor, flush: .sync)
-                    break
+                    // zlib stops a flush when the window is full and finishes it on the
+                    // next call: the flush is complete only if it left space in the window
+                    if window.writableBytes > 0 {
+                        break
+                    }
+                    try process(window)
+                    window.moveReaderIndex(to: 0)
+                    window.moveWriterIndex(to: 0)
                 } catch let error as CompressNIOError where error == .bufferOverflow {
                     try process(window)
                     window.moveReaderIndex(to: 0)
@@ -187,7 +194,14 @@ extension ByteBuffer {
             while true {
                 do {
                     try self.compressStream(to: &window, with: compressor, flush: .sync)
-                    break
+                    // zlib stops a flush when the window is full and finishes it on the
+                    // next call: the flush is complete only if it left space in the window
+                    if window.writableBytes > 0 {
+                        break
+                    }
+                    try await process(window)
+                    window.moveReaderIndex(to: 0)
+                    window.moveWriterIndex(to: 0)
                 } catch let error as CompressNIOError where error == .bufferOverflow {
                     try await process(window)
                     window.moveReaderIndex(to: 0)
