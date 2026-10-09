@@ -361,7 +361,7 @@ class CompressZlibTests: XCTestCase {
         var compressedBuffer = ByteBufferAllocator().buffer(capacity: 0)
 
         var bufferToCompress = buffer
-        try await bufferToCompress.compressStream(with: compressor, window: &window, flush: .sync) { window in
+        try bufferToCompress.compressStream(with: compressor, window: &window, flush: .sync) { window in
             var window = window
             compressedBuffer.writeBuffer(&window)
         }
@@ -409,7 +409,7 @@ class CompressZlibTests: XCTestCase {
         var compressedBuffer = ByteBufferAllocator().buffer(capacity: 0)
 
         var bufferToCompress = buffer
-        try await bufferToCompress.compressStream(with: compressor, window: &window, flush: .sync) { window in
+        try bufferToCompress.compressStream(with: compressor, window: &window, flush: .sync) { window in
             var window = window
             compressedBuffer.writeBuffer(&window)
         }
