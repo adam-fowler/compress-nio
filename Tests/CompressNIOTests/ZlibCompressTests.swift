@@ -1,6 +1,7 @@
-@testable import CompressNIO
 import NIOCore
 import XCTest
+
+@testable import CompressNIO
 
 class CompressZlibTests: XCTestCase {
     // create consistent buffer of random values. Will always create the same given you supply the same z and w values
@@ -53,7 +54,12 @@ class CompressZlibTests: XCTestCase {
         XCTAssertEqual(buffer, uncompressedBuffer)
     }
 
-    func streamCompress(_ algorithm: ZlibAlgorithm, configuration: ZlibConfiguration = .init(), buffer: inout ByteBuffer, blockSize: Int = 1024) throws -> ByteBuffer {
+    func streamCompress(
+        _ algorithm: ZlibAlgorithm,
+        configuration: ZlibConfiguration = .init(),
+        buffer: inout ByteBuffer,
+        blockSize: Int = 1024
+    ) throws -> ByteBuffer {
         // compress
         let compressor = try ZlibCompressor(algorithm: algorithm, configuration: configuration)
         var compressedBuffer = ByteBufferAllocator().buffer(capacity: buffer.readableBytes)
@@ -72,7 +78,12 @@ class CompressZlibTests: XCTestCase {
         return compressedBuffer
     }
 
-    func streamBlockCompress(_ algorithm: ZlibAlgorithm, configuration: ZlibConfiguration = .init(), buffer: inout ByteBuffer, blockSize: Int = 1024) throws -> [ByteBuffer] {
+    func streamBlockCompress(
+        _ algorithm: ZlibAlgorithm,
+        configuration: ZlibConfiguration = .init(),
+        buffer: inout ByteBuffer,
+        blockSize: Int = 1024
+    ) throws -> [ByteBuffer] {
         let compressor = try ZlibCompressor(algorithm: algorithm, configuration: configuration)
         var compressedBuffers: [ByteBuffer] = []
         let minBlockSize = blockSize / 2
@@ -95,7 +106,13 @@ class CompressZlibTests: XCTestCase {
         return compressedBuffers
     }
 
-    func streamDecompress(_ algorithm: ZlibAlgorithm, configuration: ZlibConfiguration = .init(), from: inout ByteBuffer, to: inout ByteBuffer, blockSize: Int = 1024) throws {
+    func streamDecompress(
+        _ algorithm: ZlibAlgorithm,
+        configuration: ZlibConfiguration = .init(),
+        from: inout ByteBuffer,
+        to: inout ByteBuffer,
+        blockSize: Int = 1024
+    ) throws {
         // decompress
         let decompressor = try ZlibDecompressor(algorithm: algorithm, windowSize: configuration.windowSize)
         while from.readableBytes > 0 {
@@ -109,7 +126,12 @@ class CompressZlibTests: XCTestCase {
         }
     }
 
-    func streamBlockDecompress(_ algorithm: ZlibAlgorithm, configuration: ZlibConfiguration = .init(), from: [ByteBuffer], to: inout ByteBuffer) throws {
+    func streamBlockDecompress(
+        _ algorithm: ZlibAlgorithm,
+        configuration: ZlibConfiguration = .init(),
+        from: [ByteBuffer],
+        to: inout ByteBuffer
+    ) throws {
         let decompressor = try ZlibDecompressor(algorithm: algorithm, windowSize: configuration.windowSize)
         for var buffer in from {
             var writeOutBuffer = ByteBufferAllocator().buffer(capacity: to.writableBytes)
@@ -120,7 +142,12 @@ class CompressZlibTests: XCTestCase {
         }
     }
 
-    func testStreamCompressDecompress(_ algorithm: ZlibAlgorithm, configuration: ZlibConfiguration = .init(), bufferSize: Int = 16384, blockSize: Int = 1024) throws {
+    func testStreamCompressDecompress(
+        _ algorithm: ZlibAlgorithm,
+        configuration: ZlibConfiguration = .init(),
+        bufferSize: Int = 16384,
+        blockSize: Int = 1024
+    ) throws {
         let byteBufferAllocator = ByteBufferAllocator()
         let buffer = self.createRandomBuffer(size: bufferSize, randomness: 50)
 
@@ -135,7 +162,12 @@ class CompressZlibTests: XCTestCase {
 
     /// testBlockStreamCompressDecompress is different from testStreamCompressDecompress as it decompresses the
     /// slice that were compressed while testStreamCompressDecompress decompresses on a arbitrary block size
-    func testBlockStreamCompressDecompress(_ algorithm: ZlibAlgorithm, configuration: ZlibConfiguration = .init(), bufferSize: Int = 16396, blockSize: Int = 1024) throws {
+    func testBlockStreamCompressDecompress(
+        _ algorithm: ZlibAlgorithm,
+        configuration: ZlibConfiguration = .init(),
+        bufferSize: Int = 16396,
+        blockSize: Int = 1024
+    ) throws {
         let byteBufferAllocator = ByteBufferAllocator()
         let buffer = self.createRandomBuffer(size: bufferSize, randomness: 50)
 
@@ -176,7 +208,13 @@ class CompressZlibTests: XCTestCase {
         XCTAssertEqual(buffer, uncompressedBuffer)
     }
 
-    func streamCompressWindow(_ algorithm: ZlibAlgorithm, configuration: ZlibConfiguration = .init(), inputBufferSize: Int, streamBufferSize: Int, windowSize: Int) throws {
+    func streamCompressWindow(
+        _ algorithm: ZlibAlgorithm,
+        configuration: ZlibConfiguration = .init(),
+        inputBufferSize: Int,
+        streamBufferSize: Int,
+        windowSize: Int
+    ) throws {
         // compress
         let buffer = self.createRandomBuffer(size: inputBufferSize, randomness: 40)
         var window = ByteBufferAllocator().buffer(capacity: windowSize)
@@ -201,7 +239,13 @@ class CompressZlibTests: XCTestCase {
         XCTAssertEqual(buffer, uncompressedBuffer)
     }
 
-    func streamDecompressWindow(_ algorithm: ZlibAlgorithm, configuration: ZlibConfiguration = .init(), inputBufferSize: Int, streamBufferSize: Int, windowSize: Int) throws {
+    func streamDecompressWindow(
+        _ algorithm: ZlibAlgorithm,
+        configuration: ZlibConfiguration = .init(),
+        inputBufferSize: Int,
+        streamBufferSize: Int,
+        windowSize: Int
+    ) throws {
         // compress
         let buffer = self.createRandomBuffer(size: inputBufferSize, randomness: 25)
         var window = ByteBufferAllocator().buffer(capacity: windowSize)
@@ -401,8 +445,12 @@ class CompressZlibTests: XCTestCase {
     }
 
     func testDecompressWithInputBufferError() throws {
-        var buffer1 = ByteBuffer(bytes: [0xAA, 0xE6, 0x52, 0x50, 0x50, 0x50, 0x72, 0x2C, 0x2D, 0xC9, 0x4F, 0x4A, 0xCC, 0xC8, 0x0B, 0xA8, 0x04, 0x00, 0x00, 0x00, 0xFF, 0xFF])
-        var buffer2 = ByteBuffer(bytes: [0x2A, 0xC9, 0xC8, 0xCF, 0xD3, 0x37, 0xD0, 0x33, 0xD3, 0x33, 0x50, 0xB2, 0x52, 0xA8, 0xE6, 0x52, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF])
+        var buffer1 = ByteBuffer(bytes: [
+            0xAA, 0xE6, 0x52, 0x50, 0x50, 0x50, 0x72, 0x2C, 0x2D, 0xC9, 0x4F, 0x4A, 0xCC, 0xC8, 0x0B, 0xA8, 0x04, 0x00, 0x00, 0x00, 0xFF, 0xFF,
+        ])
+        var buffer2 = ByteBuffer(bytes: [
+            0x2A, 0xC9, 0xC8, 0xCF, 0xD3, 0x37, 0xD0, 0x33, 0xD3, 0x33, 0x50, 0xB2, 0x52, 0xA8, 0xE6, 0x52, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF,
+        ])
         var buffer3 = ByteBuffer(bytes: [0x02, 0x03, 0x25, 0x43, 0x3D, 0x20, 0x04, 0x0B, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF])
         var buffer4 = ByteBuffer(bytes: [0x52, 0x80, 0x01, 0xA5, 0xA4, 0xD4, 0x8C, 0xC4, 0xB2, 0x4C, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF])
         var buffer5 = ByteBuffer(bytes: [0xCA, 0x2F, 0x02, 0x0A, 0x2B, 0xF9, 0x7B, 0x2B, 0xE9, 0x40, 0xA4, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF])

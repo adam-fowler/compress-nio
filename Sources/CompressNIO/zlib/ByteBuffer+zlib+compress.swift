@@ -1,4 +1,3 @@
-
 import NIOCore
 
 // compress extensions to ByteBuffer

@@ -1,4 +1,3 @@
-
 import NIOCore
 
 /// Protocol for decompressor
@@ -104,7 +103,7 @@ extension NIOCompressor {
     }
 
     @available(*, deprecated, message: "This function isn't used anymore")
-    public func finishWindowedStream(process: (ByteBuffer)->()) throws {
+    public func finishWindowedStream(process: (ByteBuffer) -> Void) throws {
         guard var window = self.window else { preconditionFailure("finishWindowedStream requires your compressor has a window buffer") }
         while true {
             do {

@@ -1,4 +1,3 @@
-
 import CCompressZlib
 import NIOCore
 
@@ -15,7 +14,6 @@ final class ZlibCompressorWrapper: NIOCompressor {
         self.zlibCompressor = nil
         self.window = nil
     }
-
 
     func startStream() throws {
         try self.zlibCompressor = .init(algorithm: self.algorithm, configuration: self.configuration)

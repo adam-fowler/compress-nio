@@ -1,4 +1,3 @@
-
 /// Compression Algorithm type
 public struct CompressionAlgorithm: CustomStringConvertible, Sendable {
     fileprivate enum AlgorithmEnum: Sendable {
@@ -48,16 +47,16 @@ public struct CompressionAlgorithm: CustomStringConvertible, Sendable {
 
     /// Deflate with gzip header
     public static func gzip(configuration: ZlibConfiguration = .init()) -> CompressionAlgorithm {
-        return CompressionAlgorithm(algorithm: .gzip(configuration: configuration))
+        CompressionAlgorithm(algorithm: .gzip(configuration: configuration))
     }
 
     /// Deflate with zlib header
     public static func zlib(configuration: ZlibConfiguration = .init()) -> CompressionAlgorithm {
-        return CompressionAlgorithm(algorithm: .zlib(configuration: configuration))
+        CompressionAlgorithm(algorithm: .zlib(configuration: configuration))
     }
 
     /// Raw deflate without a header
     public static func deflate(configuration: ZlibConfiguration = .init()) -> CompressionAlgorithm {
-        return CompressionAlgorithm(algorithm: .deflate(configuration: configuration))
+        CompressionAlgorithm(algorithm: .deflate(configuration: configuration))
     }
 }
